@@ -127,10 +127,11 @@ ${BANNER}
   <p class="hint">Tap the play button on the card. Only this track's player is loaded. Marketplaces show animation_url in a sandboxed frame like this one; <button id="alone" class="linkish">open this page on its own</button> to test it as a top-level page (background audio and lock-screen controls can differ).</p>
   <details class="lab" id="lab">
     <summary>Design lab: play button</summary>
-    <p class="muted">Try other values for the page's button settings (its stylesheet's --play-min, --play-max and --play-target). Each change reloads this track's player. Changed values are not the shipped page, and the banner above the player says so.</p>
+    <p class="muted">Try other values for the page's button settings (its stylesheet's --play-min, --play-max and --play-target). The button is drawn at the art's own size for it (the card's play anchor, in card units, times the card's scale on this screen), kept between the minimum and the maximum: set both to the same value for a fixed size. Each change reloads this track's player. Changed values are not the shipped page, and the banner above the player says so.</p>
     <label class="slider"><span>Minimum diameter: <b id="vmin"></b></span><input type="range" id="lmin" min="16" max="64" step="1"></label>
     <label class="slider"><span>Maximum diameter: <b id="vmax"></b></span><input type="range" id="lmax" min="32" max="200" step="2"></label>
     <label class="slider"><span>Touch target: <b id="vtarget"></b></span><input type="range" id="ltarget" min="24" max="64" step="1"></label>
+    <p class="muted" id="lnow" aria-live="polite"></p>
     <button id="lreset">Reset to the shipped settings</button>
   </details>
   <h3 style="font-size:16px;margin:12px 0 0">Listen for</h3>
@@ -248,7 +249,7 @@ function mountFrame(t) {
   f.setAttribute("allow", "autoplay");
   f.setAttribute("title", "Player: " + t.title);
   f.srcdoc = pageOf(t, variant());
-  pw.appendChild(f); frame = f;
+  pw.appendChild(f); frame = f; paintNow();
 }
 
 function go(i, doScroll) {
@@ -350,8 +351,19 @@ function paintLab() {
   $("vmin").textContent = l.min + " px" + (l.min === SHIP.min ? " (shipped)" : "");
   $("vmax").textContent = l.max + " px" + (l.max === SHIP.max ? " (shipped)" : "");
   $("vtarget").textContent = l.target + " px" + (l.target === SHIP.target ? " (shipped)" : "");
+  paintNow();
   var b = $("labbadge"); b.hidden = !labOn(); b.textContent = labOn() ? "Design lab override, not the shipped page: " + labText() + "." : "";
 }
+// What the page will draw on this screen: the anchor's diameter (card units) times the card's scale
+// (the art fills the frame as object-fit: contain does, 250 x 350 units), clamped to the limits
+function paintNow() {
+  if (!SHIP || !frame) return;
+  var S = +((D.meta.playAnchor || "").split(/[\\s,]+/)[2]), r = frame.getBoundingClientRect(), k = Math.min(r.width / 250, r.height / 350);
+  var l = labValues(), art = S * k, d = Math.min(l.max, Math.max(l.min, art));
+  var why = art < l.min ? "raised to the minimum" : art > l.max ? "capped at the maximum" : "the art's size, inside the limits";
+  $("lnow").textContent = S > 0 ? "On this screen: the card is drawn at " + k.toFixed(2) + "x (frame " + Math.round(r.width) + " x " + Math.round(r.height) + " px), so the art asks for " + S + " units x " + k.toFixed(2) + " = " + art.toFixed(1) + " px. The button is " + Math.round(d) + " px (" + why + "), with a " + Math.max(l.target, Math.round(d)) + " px touch target." : "";
+}
+window.addEventListener("resize", paintNow);
 function labValues() { var mn = +$("lmin").value, mx = +$("lmax").value; if (mx < mn) mx = mn; return { min: mn, max: mx, target: +$("ltarget").value }; }
 ["lmin", "lmax", "ltarget"].forEach(function (id) {
   $(id).addEventListener("input", function () { var keep = store.lab; store.lab = labValues(); paintLab(); store.lab = keep; });

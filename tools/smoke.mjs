@@ -210,6 +210,8 @@ await page.uncheck("#cardSync");
   await page.click("#export"); await page.waitForTimeout(200);
   const exp = await page.evaluate(() => window.__clip || document.getElementById("exporttext").value);
   ok("design lab overrides the button settings in the frame, flagged", !ship.lab && lab.lab && lab.d === 24 && lab.hit6 && /not the shipped page/.test(badge || ""), `shipped ${ship.d} px, lab ${lab.d} px (target 56 px reaches 6 px outside: ${lab.hit6}), badge: ${badge}`);
+  const said = await page.evaluate(() => +((/The button is (\d+) px/.exec(document.getElementById("lnow").textContent) || [])[1]));
+  ok("lab readout states the drawn size", Math.abs(said - lab.d) <= 1, `readout ${said} px, drawn ${lab.d} px`);
   ok("export names the lab override", /Design lab override \(not the shipped page\): minimum 24 px/.test(exp));
   await page.click("#lreset");
   const back = await btn();

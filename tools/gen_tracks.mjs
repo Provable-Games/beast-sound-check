@@ -161,6 +161,9 @@ function build({ id, section, title, blurb, checks, settings, midi, pick, string
   if (!stringsIn) title = `${title} \u00b7 ${bpmText}`;
   usedArt.push({ id: beast.id, shiny: !!beast.shiny, track: id });
   const variants = [["gif", false], ["synced", false], ["synced", true]].map(([mode, cardSync]) => ART.card({ beast, art, tempoUs, mode, cardSync, strings, mediaTitle: `${title} (${strings.name})` }));
+  const anchor = (/data-play-anchor="([^"]*)"/.exec(variants[1]) || [])[1];
+  if (!anchor || (playAnchor && anchor !== playAnchor)) throw new Error(`${title}: the art's data-play-anchor differs between tracks`);
+  playAnchor = anchor;
   const { d, settings_len } = SEG.dFragment(midi, settings);
   const mem = `"name":"${jsonText(title)}","description":"${jsonText(blurb)}","attributes":[{"trait_type":"Track","value":"${id}"}]`;
   const pages = variants.map((svg, vi) => {
@@ -197,6 +200,7 @@ const FIXED = {
   head: CMP.ownedFragment("head"), gunzip: SEG.fixedFragment("gunzip"), player: SEG.fixedFragment("player"),
   body: CMP.ownedFragment(ALIGN.trustedArt ? "trusted_body" : "body"), footer: CMP.ownedFragment("footer"),
 };
+let playAnchor = ""; // the art's data-play-anchor, the same on every card (art.mjs)
 const jsonText = (x) => x.replace(/[\\"]/g, "\\$&").replace(/[\u0000-\u001f]/g, " ");
 function splitPage(html, art, d, title) {
   const ws = [];
@@ -889,7 +893,7 @@ const meta = {
   generated: new Date().toISOString(), playerVersion: SEG.VERSION, fixedBytes: Object.values(FIXED).reduce((n, f) => n + f.length, 0),
   beastCommit: need("BEAST_LABEL"), ompCommit: need("OMP_LABEL"),
   bankFail, warn,
-  beast: beastSummary, usedArt,
+  beast: beastSummary, usedArt, playAnchor,
 };
 fs.writeFileSync(path.join(here, "tracks.json"), JSON.stringify({ meta, fixed: FIXED, tracks }));
 const counts = {};
