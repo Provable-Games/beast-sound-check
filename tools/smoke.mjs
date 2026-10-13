@@ -30,14 +30,14 @@ page.on("pageerror", (e) => errors.push("pageerror: " + e));
 const results = [];
 const ok = (name, pass, detail = "") => { results.push({ name, pass, detail }); console.log(`${pass ? "PASS" : "FAIL"} ${name} ${detail}`); };
 
-const SITE = process.env.SITE || "index.html", PREVIEW = /next/.test(SITE);
+const SITE = process.env.SITE || "../index.html", PREVIEW = true; // 0.7.0 pages always carry background audio and media controls
 await page.goto("file://" + path.join(here, SITE));
 console.log(engine, browser.version());
 const n = await page.locator(".trk").count();
 ok("track list renders", n > 50, `${n} tracks, ${await page.locator(".list details").count()} sections`);
 const sw = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
 ok("no horizontal scroll", sw[0] <= sw[1], `scrollWidth ${sw[0]} / ${sw[1]}`);
-if (PREVIEW) { const bn = await page.locator(".banner").textContent(); ok("preview banner", /Preview: player 0\.4\.0/.test(bn), bn); ok("background audio checks in the global list", (await page.locator("[data-g^=bg]").count()) === 3); }
+ok("background audio checks in the global list", (await page.locator("[data-g^=bg]").count()) === 3);
 ok("title", (await page.title()) === "Beast Sound Check", await page.title());
 ok("one iframe loaded", (await page.locator("iframe").count()) === 1);
 const t0 = await page.locator("#ttl").textContent();
@@ -56,7 +56,7 @@ await page.click("#export");
 await page.waitForTimeout(300);
 const exp = await page.evaluate(() => document.getElementById("exporttext").value + "|" + document.getElementById("toast").textContent);
 ok("export produces a summary", /Pass 1, fail 1/.test(exp) || /Results copied/.test(exp), exp.slice(0, 80).replace(/\n/g, " "));
-const stored = await page.evaluate((k) => { try { return localStorage.getItem(k); } catch (e) { return "blocked"; } }, PREVIEW ? "beast-sound-check-next-v1" : "beast-sound-check-v1");
+const stored = await page.evaluate((k) => { try { return localStorage.getItem(k); } catch (e) { return "blocked"; } }, await page.evaluate(() => "beast-sound-check-" + JSON.parse(document.getElementById("data").textContent).meta.playerVersion + "-v1"));
 ok("localStorage written (or cleanly blocked)", stored === "blocked" || /smoke note/.test(stored || ""), stored === "blocked" ? "blocked" : "saved");
 
 // one track per section: load, play, stop
@@ -111,7 +111,7 @@ for (const ids of sections) {
       const t = await frame.evaluate(() => window.__ac.currentTime);
       await frame.click("#play");
       const label2 = await frame.getAttribute("#play", "aria-label");
-      ok(`${id} ${title}`, label1 === "Stop" && label2 === "Play" && t > 0.3 && !err, `ctx running, t=${t.toFixed(2)}s, labels ${label1}/${label2}${err ? ", error text: " + err : ""}${mmInfo}`);
+      ok(`${id} ${title}`, label1 === "Pause" && label2 === "Play" && t > 0.3 && !err, `ctx running, t=${t.toFixed(2)}s, labels ${label1}/${label2}${err ? ", error text: " + err : ""}${mmInfo}`);
     } catch (e) {
       ok(`${id} ${title}`, false, String(e).split("\n")[0]);
     }
@@ -148,7 +148,11 @@ async function stepTest(titlePrefix, wantFrames, play) {
   if (play) await frame.click("#play");
   return { changes, distinct };
 }
-const syncedHas = await page.evaluate(() => { const f = document.querySelector("iframe"); return [f.srcdoc.includes("data:image/png"), f.srcdoc.includes("data:image/gif")]; });
+const artHtml = async () => { const f = await (await page.locator("iframe").elementHandle()).contentFrame(); await f.waitForSelector("#play:not([disabled])"); return f.evaluate(() => { const a = document.getElementById("beast-art"); return a.localName + "|" + a.outerHTML; }); };
+const has = (h) => [h.includes("data:image/png"), h.includes("data:image/gif")];
+const a0 = await artHtml();
+ok("trusted art is inline SVG", a0.startsWith("svg|"), a0.slice(0, 4));
+const syncedHas = has(a0);
 ok("default art is Synced (sprite PNG, no GIF)", syncedHas[0] && !syncedHas[1], JSON.stringify(syncedHas));
 for (const [t, n] of [["Pulse 25% Lead (2)", 4], ["Pulse 12.5% Lead (1)", 3]]) {
   for (const play of [false, true]) {
@@ -157,12 +161,38 @@ for (const [t, n] of [["Pulse 25% Lead (2)", 4], ["Pulse 12.5% Lead (1)", 3]]) {
   }
 }
 await page.click("#aGif");
-const gifHas = await page.evaluate(() => { const f = document.querySelector("iframe"); return [f.srcdoc.includes("data:image/png"), f.srcdoc.includes("data:image/gif")]; });
+await page.waitForTimeout(300); const gifHas = has(await artHtml());
 ok("Original GIF toggle swaps the art", !gifHas[0] && gifHas[1], JSON.stringify(gifHas));
 await page.click("#aSync"); await page.check("#cardSync");
-const cs = await page.evaluate(() => document.querySelector("iframe").srcdoc.match(/gradientTransform[^>]*dur='([^']*)'/)[1]);
+await page.waitForTimeout(300); const cs = ((await artHtml()).match(/gradientTransform[^>]*dur="([^"]*)"/) || [])[1];
 ok("Card synced sets the rim to 16 beats", /^\d+(\.\d+)?s$/.test(cs) && cs !== "6s", cs);
 await page.uncheck("#cardSync");
+
+// ---- pause keeps the position, resume carries on, the inline art follows the music
+{
+  await page.evaluate(() => { const b = Array.from(document.querySelectorAll(".trk")).find((x) => x.querySelector(".id").textContent === "1.03"); b.closest("details").open = true; b.click(); });
+  await page.waitForTimeout(300); await page.locator("#pw").scrollIntoViewIfNeeded();
+  const f = await (await page.locator("iframe").elementHandle()).contentFrame();
+  await f.waitForSelector("#play:not([disabled])");
+  await f.click("#play");
+  await f.waitForFunction(() => { const s = window.OnchainMidiPlayer.getPlayStatus(); return s.state === "playing" && s.positionSeconds > 2; }, null, { timeout: 15000 });
+  const drift = () => f.evaluate(() => { const s = window.OnchainMidiPlayer.getPlayStatus(), a = document.getElementById("beast-art"); let d = a.getCurrentTime() - (s.positionSeconds + 0.017); if (s.passSeconds) d -= Math.round(d / s.passSeconds) * s.passSeconds; return { pos: s.positionSeconds, drift: d, mon: window.OnchainArtMonitor }; });
+  const d1 = await drift();
+  ok("art follows the music while playing", Math.abs(d1.drift) < 0.1, `pos ${d1.pos.toFixed(2)}s, art-music ${(d1.drift * 1000).toFixed(0)} ms, monitor max ${(d1.mon.maxDrift * 1000).toFixed(0)} ms`);
+  await f.click("#play");
+  await f.waitForFunction(() => window.OnchainMidiPlayer.getPlayStatus().state === "paused" && window.__ac.state === "suspended", null, { timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(300); // the art freezes on the first animation frame that sees the suspended clock
+  const p1 = await f.evaluate(() => [window.OnchainMidiPlayer.getPlayStatus(), document.getElementById("beast-art").animationsPaused(), document.getElementById("beast-art").getCurrentTime(), window.__ac.state]);
+  await page.waitForTimeout(1200);
+  const p2 = await f.evaluate(() => [window.OnchainMidiPlayer.getPlayStatus().positionSeconds, document.getElementById("beast-art").getCurrentTime()]);
+  ok("pause holds the music and freezes the art", p1[0].state === "paused" && p1[3] === "suspended" && p1[1] && Math.abs(p2[0] - p1[0].positionSeconds) < 0.02 && Math.abs(p2[1] - p1[2]) < 0.02, `state ${p1[0].state}, audio ${p1[3]}, art paused ${p1[1]}, held at ${p1[0].positionSeconds?.toFixed(2)}s`);
+  await f.click("#play");
+  await f.waitForFunction(() => window.OnchainMidiPlayer.getPlayStatus().state === "playing" && window.__ac.state === "running", null, { timeout: 5000 });
+  await page.waitForTimeout(800);
+  const d2 = await drift();
+  ok("resume carries on from the held point, art in step", d2.pos > p1[0].positionSeconds && d2.pos < p1[0].positionSeconds + 3 && Math.abs(d2.drift) < 0.1, `resumed at ${d2.pos.toFixed(2)}s (held ${p1[0].positionSeconds.toFixed(2)}s), art-music ${(d2.drift * 1000).toFixed(0)} ms`);
+  await f.click("#play");
+}
 
 ok("no console errors", errors.length === 0, errors.slice(0, 3).join(" | "));
 ok("no network requests", requests.length === 0, requests.slice(0, 3).join(" | "));

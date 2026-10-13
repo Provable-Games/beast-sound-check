@@ -1,16 +1,20 @@
 #!/usr/bin/env node
 // Stage 1 of the listening-test site: builds tracks.json (one real animation_url page per track).
 //
-//   OMP=<onchain-midi-player checkout> BEAST=<midi_fun_contract checkout on beast-music> node gen_tracks.mjs
+//   OMP=<onchain-midi-player checkout> BEAST=<midi_fun_contract checkout> BEASTS3=<beasts-v3 checkout> node gen_tracks.mjs
 //
-// OMP    default /workspace/onchain-tinysynth-worktrees/mobile-site (a worktree of origin/main)
-// BEAST  default /workspace/midi_fun_contract-worktrees/mobile-site (a worktree of origin/beast-music).
-//        offchain/beast-sound needs `npm install` (@scure/starknet) - do that in a worktree, never in
-//        the user's checkout.
+// OMP     an onchain-midi-player checkout at the player under test (0.7.0+), with `npm ci` run in it.
+// BEAST   a midi_fun_contract checkout (main); offchain/beast-sound needs `npm install` (@scure/starknet).
+//         Run installs in worktrees, never in someone's working checkout.
+// BEASTS3 a beasts-v3 checkout for the card template and genesis GIFs (art.mjs).
+// OMP_LABEL / BEAST_LABEL name those commits in the page's footer.
 //
-// Every page is PAGE ++ D(settings, midi) ++ art, built with onchain-midi-player's JS reference
-// (scripts/preview.mjs buildPreview, scripts/page.mjs) and round-tripped through spliceTokenUri /
-// decodeTokenUri, so the bytes are what token_uri's animation_url carries.
+// Every page is the complete NFT-owned document of onchain-midi-player's reference Beast consumer
+// (examples/beast_consumer: scripts/composition.mjs consumerPieces with the example's ALIGN options):
+// head ++ gunzip ++ player ++ trusted body ++ art ++ D(settings, midi) ++ footer (bootstrap: controls,
+// art sync, background audio, media session). Each page is round-tripped through the spliced token_uri
+// and decodeTokenUri, and the token_uri passes scripts/validate_token_uri.mjs, so the bytes are what a
+// 0.7.0 Beast's animation_url would carry.
 //
 // Beast MIDI path (same as scripts/tinysynth_e2e/fixtures.mjs, which provider.cairo documents as
 // byte-identical to Cairo's v11_score_full_smf_bytes): createEngineV11(engine).render(beast, live,
@@ -21,13 +25,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const OMP = process.env.OMP || "/workspace/onchain-tinysynth-worktrees/mobile-site";
-const BEAST = process.env.BEAST || "/workspace/midi_fun_contract-worktrees/mobile-site";
+const need = (k) => process.env[k] || (console.error(`set ${k} (see the header)`), process.exit(2));
+const OMP = need("OMP");
+const BEAST = need("BEAST");
 const BS = BEAST + "/offchain/beast-sound";
 const imp = (p) => import(p);
 
-const { buildPreview } = await imp(OMP + "/scripts/preview.mjs");
-const PG = await imp(OMP + "/scripts/page.mjs");
+const SEG = await imp(OMP + "/scripts/segments.mjs");
+const CMP = await imp(OMP + "/scripts/composition.mjs");
+const { ALIGN } = await imp(OMP + "/examples/beast_consumer/scripts/reference.mjs");
+const { validateTokenUri } = await imp(OMP + "/scripts/validate_token_uri.mjs");
 const SF = await imp(OMP + "/scripts/settings_fixtures.mjs");
 const RW = await imp(OMP + "/scripts/reference_waves.mjs");
 const { engine: E } = await imp(BS + "/src/index.js");
@@ -153,22 +160,21 @@ function build({ id, section, title, blurb, checks, settings, midi, pick, string
   const strings = stringsIn || { name: TABLES.species[beast.id - 1], type: TYPE_NAMES[beast.beast_type], prefix: TABLES.prefixes[beast.prefix - 1], suffix: TABLES.suffixes[beast.suffix - 1] };
   if (!stringsIn) title = `${title} \u00b7 ${bpmText}`;
   usedArt.push({ id: beast.id, shiny: !!beast.shiny, track: id });
-  const variants = [["gif", false], ["synced", false], ["synced", true]].map(([mode, cardSync]) => ART.card({ beast, art, tempoUs, mode, cardSync, strings, mediaTitle: process.env.MEDIA_TITLE ? `${title} (${strings.name})` : "" }));
-  const midiB64 = Buffer.from(midi).toString("base64");
-  const pageHtml = PG.pageHtml();
-  const { d } = PG.dFragment(midi, settings);
-  const svgs = [];
-  variants.forEach((svg, vi) => {
-    const { html, lines } = buildPreview({ midiArg: midiB64, settings, svg: Buffer.from(svg, "utf8") });
-    if (!html.subarray(0, pageHtml.length).equals(Buffer.from(pageHtml, "latin1"))) throw new Error("page prefix mismatch");
-    if (vi === 0) {
-      // Round trip through the consumer's token_uri splice and a marketplace's decode: the page must be PAGE ++ D ++ SVG.
-      const uri = PG.spliceTokenUri({ mem: `"name":"${title.replace(/[^A-Za-z0-9 .,+%-]/g, "")}"`, svg, pageHtml, d });
-      if (!PG.decodeTokenUri(uri).htmlBytes.equals(html)) throw new Error(`${title}: token_uri round trip differs from PAGE ++ D ++ SVG`);
+  const variants = [["gif", false], ["synced", false], ["synced", true]].map(([mode, cardSync]) => ART.card({ beast, art, tempoUs, mode, cardSync, strings, mediaTitle: `${title} (${strings.name})` }));
+  const { d, settings_len } = SEG.dFragment(midi, settings);
+  const mem = `"name":"${jsonText(title)}","description":"${jsonText(blurb)}","attributes":[{"trait_type":"Track","value":"${id}"}]`;
+  const pages = variants.map((svg, vi) => {
+    const p = CMP.consumerPieces(mem, svg, { midi, settings, ...ALIGN });
+    if (p.d !== d) throw new Error(`${title}: data fragment differs`);
+    // what a marketplace decodes from the spliced token_uri must be the composed document
+    if (!SEG.decodeTokenUri(p.uri).htmlBytes.equals(Buffer.from(p.html, "utf8"))) throw new Error(`${title}: token_uri round trip differs from the composed page`);
+    if (vi === 1) {
+      const r = validateTokenUri({ uri: p.uri });
+      const fails = r.checks.filter((c) => c.level === "fail");
+      if (fails.length) throw new Error(`${title}: validate_token_uri: ` + fails.map((c) => `${c.id}: ${c.message}`).join("; "));
+      for (const c of r.checks) if (c.level === "warn" && !/attributes/.test(c.id)) warn.push(`${id} ${c.id}: ${c.message}`);
     }
-    if (html.subarray(pageHtml.length).toString("utf8") !== d + svg) throw new Error("tail mismatch");
-    const fails = lines.filter((l) => l.startsWith("FAIL")); if (fails.length) throw new Error(title + ": " + fails.join("; "));
-    svgs.push(svg);
+    return splitPage(p.html, p.art, d, title);
   });
   const fl = ART.frameUs(art.n, tempoUs);
   const sub = tempoUs / 2 < 200000 ? "quarter note (the eighth would be under 0.2 s)" : "eighth note";
@@ -178,14 +184,32 @@ function build({ id, section, title, blurb, checks, settings, midi, pick, string
   ];
   tracks.push({
     id, sectionId: section[0], section: section.slice(2), title, blurb, checks: [...checks, ...artChecks],
-    midiBytes: midi.length, settingsBytes: d.indexOf("<"),
+    midiBytes: midi.length, settingsBytes: settings_len,
     art: { id: beast.id, name: strings.name, shiny: !!beast.shiny, frames: art.n, gifBytes: art.gif.length, spriteBytes: art.png.length, bpm: +bpm.toFixed(2), frameMs: +(fl / 1000).toFixed(1) },
-    d, svgs,
+    d, pages,
   });
   return id;
 }
-// the tail (D ++ SVG) is ASCII + UTF-8 art; PAGE is shared and stored once
-const PAGE_TEXT = PG.pageHtml();
+// The composed page is FIXED.head ++ ws ++ FIXED.gunzip ++ ws ++ FIXED.player ++ FIXED.body ++ art ++ D ++ ws
+// ++ FIXED.footer, where each ws is the alignment whitespace consumerPieces adds (it depends on the token's
+// JSON and art lengths). The fixed fragments are stored once; each track keeps its art, D and ws lengths.
+const FIXED = {
+  head: CMP.ownedFragment("head"), gunzip: SEG.fixedFragment("gunzip"), player: SEG.fixedFragment("player"),
+  body: CMP.ownedFragment(ALIGN.trustedArt ? "trusted_body" : "body"), footer: CMP.ownedFragment("footer"),
+};
+const jsonText = (x) => x.replace(/[\\"]/g, "\\$&").replace(/[\u0000-\u001f]/g, " ");
+function splitPage(html, art, d, title) {
+  const ws = [];
+  let at = 0;
+  const take = (frag, gap) => {
+    if (gap) { let n = 0; while (html[at + n] === " ") n++; if (n % 9) throw new Error(`${title}: odd alignment gap ${n}`); ws.push(n / 9); at += n; }
+    if (!html.startsWith(frag, at)) throw new Error(`${title}: page layout differs from head ++ gunzip ++ player ++ body ++ art ++ D ++ footer at byte ${at}`);
+    at += frag.length;
+  };
+  take(FIXED.head); take(FIXED.gunzip, true); take(FIXED.player, true); take(FIXED.body); take(art); take(d); take(FIXED.footer, true);
+  if (at !== html.length) throw new Error(`${title}: trailing bytes`);
+  return { art, ws };
+}
 
 const SEC = { beast: "1 Beast compositions", preset: "2 TinyChip presets", drum: "3 Drums", edge: "4 General range and edge cases", bank: "5 Client chip bank (not onchain)" };
 
@@ -862,12 +886,12 @@ for (const [id, pick] of Object.entries(BEAST_OVERRIDE)) {
 }
 for (const sp of specs) build(sp);
 const meta = {
-  generated: new Date().toISOString(), pageVersion: PG.VERSION, pageBytes: PAGE_TEXT.length,
-  beastCommit: process.env.BEAST_LABEL || "origin/beast-music 2068be7", ompCommit: process.env.OMP_LABEL || "origin/main 1787a93",
+  generated: new Date().toISOString(), playerVersion: SEG.VERSION, fixedBytes: Object.values(FIXED).reduce((n, f) => n + f.length, 0),
+  beastCommit: need("BEAST_LABEL"), ompCommit: need("OMP_LABEL"),
   bankFail, warn,
   beast: beastSummary, usedArt,
 };
-fs.writeFileSync(path.join(here, "tracks.json"), JSON.stringify({ meta, page: PAGE_TEXT, tracks }));
+fs.writeFileSync(path.join(here, "tracks.json"), JSON.stringify({ meta, fixed: FIXED, tracks }));
 const counts = {};
 tracks.forEach((t) => { counts[t.section] = (counts[t.section] || 0) + 1; });
 console.log(counts, "total", tracks.length, "bankFail", bankFail, "warn", warn);

@@ -10,13 +10,13 @@ const data = JSON.parse(fs.readFileSync(path.join(here, "tracks.json"), "utf8"))
 // JSON inside a <script type="application/json">: no "<" may survive (pages contain </script>).
 const json = JSON.stringify(data).replace(/</g, "\\u003c").replace(new RegExp("\\u2028", "g"), "\\u2028").replace(new RegExp("\\u2029", "g"), "\\u2029");
 
-const PREVIEW = !!process.env.PREVIEW;
-const BANNER = PREVIEW ? `<div class="banner" role="note">Preview: player 0.4.0 (background audio, media controls)</div>` : "";
-const BGBLOCK = PREVIEW ? `
-  <div class="bgblock"><b>Background audio checks</b> (player 0.4.0)</div>
+const V = data.meta.playerVersion;
+const BANNER = "";
+const BGBLOCK = `
+  <div class="bgblock"><b>Background audio checks</b> (player ${V})</div>
   <label><input type="checkbox" data-g="bgandroid"><span><b>Android.</b> After play, the notification and Media Output show the Beast's frames side by side (a filmstrip), the whole Beast visible with no cropped face, with the track title. Pause and play work from the notification, and the lock screen controls work. Audio keeps playing with the screen locked.</span></label>
   <label><input type="checkbox" data-g="bgios"><span><b>iOS.</b> It plays with the silent switch on, and Now Playing on the lock screen shows the track with working play and pause.</span></label>
-  <label><input type="checkbox" data-g="bgdesktop"><span><b>Desktop.</b> The browser's media hub or media keys show the track and its art, and pause and play from there match what you hear.</span></label>` : "";
+  <label><input type="checkbox" data-g="bgdesktop"><span><b>Desktop.</b> The browser's media hub or media keys show the track and its art, and pause and play from there match what you hear.</span></label>`;
 const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -63,6 +63,7 @@ details.card>summary{cursor:pointer;font-weight:600;min-height:44px;display:flex
 .playerwrap{scroll-margin:12px 0 96px;position:relative;width:100%;aspect-ratio:1/1;max-height:62vh;margin:10px auto;background:#000;border-radius:12px;overflow:hidden}
 .playerwrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
 .hint{font-size:13px;color:var(--muted);margin:0 0 6px}
+.linkish{background:none;border:0;padding:0;min-height:0;color:var(--accent);font:inherit;text-decoration:underline;cursor:pointer}
 .row{display:flex;gap:10px}
 .row>button{flex:1}
 .artrow{margin:4px 0 8px}.artrow button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-text);font-weight:600}
@@ -104,8 +105,8 @@ ${BANNER}
   <label><input type="checkbox" data-g="tap"><span><b>Tap to start.</b> A track is silent until you tap the round play button in the player. The art shows first. After the tap, audio begins within about half a second, with no error text at the bottom of the player.</span></label>
   <label><input type="checkbox" data-g="silent"><span><b>iPhone silent switch.</b> Flip the side switch to silent and play a track. Note whether you hear it (Web Audio on iOS often follows the switch). Flip it back before testing.</span></label>
   <label><input type="checkbox" data-g="headphones"><span><b>Headphones, then Bluetooth.</b> Plug in wired headphones mid-track, then connect Bluetooth. Playback should carry on or resume without crackle. Note the Bluetooth delay between the art and the sound.</span></label>
-  <label><input type="checkbox" data-g="background"><span><b>Background the tab and return.</b> Play, switch to another app or tab for 10 seconds, come back. Note whether the audio kept playing while hidden. On return, the play/stop button must match what you hear, and playback must have no glitch.</span></label>
-  <label><input type="checkbox" data-g="stop"><span><b>Stop button.</b> Tap the stop square while a dense track plays. All sound must cut at once (no stuck notes); tapping play again restarts from the beginning.</span></label>${BGBLOCK}
+  <label><input type="checkbox" data-g="background"><span><b>Background the tab and return.</b> Play, switch to another app or tab for 10 seconds, come back. Note whether the audio kept playing while hidden. On return, the play/pause button must match what you hear, and playback must have no glitch.</span></label>
+  <label><input type="checkbox" data-g="pause"><span><b>Pause and resume.</b> Tap pause while a dense track plays. All sound must stop at once (no stuck notes) and the art freezes on the frame you last heard. Tap play: the music carries on from the same point and the art moves again in step with it.</span></label>${BGBLOCK}
 </details>
 
 <section class="card" id="cur" aria-live="polite">
@@ -119,7 +120,7 @@ ${BANNER}
   </div>
   <label class="cardsync"><input type="checkbox" id="cardSync"><span>Card synced (rim 16 beats, pulse 4 beats, logo 8 beats; Synced art only)</span></label>
   <p class="muted" id="artinfo"></p>
-  <p class="hint">Tap the play button (bottom right of the player). Only this track's player is loaded.</p>
+  <p class="hint">Tap the play button on the card. Only this track's player is loaded. Marketplaces show animation_url in a sandboxed frame like this one; <button id="alone" class="linkish">open this page on its own</button> to test it as a top-level page (background audio and lock-screen controls can differ).</p>
   <h3 style="font-size:16px;margin:12px 0 0">Listen for</h3>
   <ul class="checks" id="checks"></ul>
   <div class="rate row" style="margin-top:12px">
@@ -155,11 +156,13 @@ ${BANNER}
 (function(){
 "use strict";
 var D = JSON.parse(document.getElementById("data").textContent);
-var T = D.tracks, PAGE = D.page, KEY = "${PREVIEW ? "beast-sound-check-next-v1" : "beast-sound-check-v1"}";
-var store = { r: {}, g: {}, last: "", art: "synced", card: false, v: 2 };
+var T = D.tracks, F = D.fixed, KEY = "beast-sound-check-${V}-v1";
+// the page as consumerPieces composed it: fixed fragments, this track's art and D, and its alignment whitespace
+function pageOf(t, v) { var p = t.pages[v], sp = function (n) { return new Array(9 * n + 1).join(" "); };
+  return F.head + sp(p.ws[0]) + F.gunzip + sp(p.ws[1]) + F.player + F.body + p.art + t.d + sp(p.ws[2]) + F.footer; }
+function variant() { return store.art === "gif" ? 0 : store.card ? 2 : 1; }
+var store = { r: {}, g: {}, last: "", art: "synced", card: false, v: 1 };
 try { var raw = localStorage.getItem(KEY); if (raw) { var o = JSON.parse(raw); if (o && typeof o === "object") { store.r = o.r || {}; store.g = o.g || {}; store.last = o.last || ""; store.art = o.art === "gif" ? "gif" : "synced"; store.card = !!o.card;
-  // v2: tracks 3.01 and 5.10 changed their music and Beast, so results saved before are for different content: drop just those two once
-  if ((o.v || 0) < 2) { delete store.r["301"]; delete store.r["510"]; }
 } } } catch (e) {}
 function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} }
 save();
@@ -170,9 +173,9 @@ var idx = 0, frame = null, noteTimer = 0;
 function byId(id) { for (var i = 0; i < T.length; i++) if (T[i].id === id) return i; return -1; }
 function label(t) { return t.sectionId + "." + t.id.slice(1); }
 
-$("intro").textContent = T.length + " tracks. Each is the real onchain animation_url page (engine, player, SETTINGS, MIDI, art), embedded in a sandboxed frame, and every track has its own animated Beast (all 75 genesis species appear). The art defaults to Synced (sprite sheet stepped on the beat); switch to the original GIF to compare. Results are saved on this device.";
+$("intro").textContent = T.length + " tracks. Each is the complete animation_url page of onchain-midi-player " + (D.meta.playerVersion) + "'s reference Beast consumer (the player's engine, the NFT's own controls, art sync and background audio, the track's settings, MIDI and art), embedded in a sandboxed frame, and every track has its own animated Beast (all 75 genesis species appear). The art defaults to Synced (sprite sheet stepped on the beat and seeked to the music); switch to the original GIF to compare (a GIF runs on its own clock). Results are saved on this device.";
 var meta = D.meta || {};
-$("foot").textContent = "Page " + meta.pageVersion + ", " + (meta.beastCommit || "") + ", " + (meta.ompCommit || "") + ". Generated " + (meta.generated || "").slice(0, 10) + ".";
+$("foot").textContent = "Player " + meta.playerVersion + ", " + (meta.beastCommit || "") + ", " + (meta.ompCommit || "") + ". Generated " + (meta.generated || "").slice(0, 10) + ".";
 
 // global checklist
 Array.prototype.forEach.call(document.querySelectorAll("[data-g]"), function (cb) {
@@ -224,7 +227,7 @@ function mountFrame(t) {
   f.setAttribute("sandbox", "allow-scripts");
   f.setAttribute("allow", "autoplay");
   f.setAttribute("title", "Player: " + t.title);
-  f.srcdoc = PAGE + t.d + t.svgs[store.art === "gif" ? 0 : store.card ? 2 : 1];
+  f.srcdoc = pageOf(t, variant());
   pw.appendChild(f); frame = f;
 }
 
@@ -293,7 +296,8 @@ function summary() {
     else untested.push(label(t));
   });
   var g = Object.keys(store.g).filter(function (k) { return store.g[k]; });
-  var out = ["Beast Sound Check results", new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC", navigator.userAgent, "",
+  var out = ["Beast Sound Check results", new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC", navigator.userAgent,
+    "Player " + meta.playerVersion + ", " + meta.ompCommit + "; music " + meta.beastCommit + "; built " + (meta.generated || "").slice(0, 16), "",
     "Pass " + pass + ", fail " + fail + ", untested " + (T.length - pass - fail) + " of " + T.length,
     "Global checklist ticked: " + (g.length ? g.join(", ") : "none"), ""];
   return out.concat(lines.filter(function (l) { return l.indexOf("FAIL") === 0; }), lines.filter(function (l) { return l.indexOf("FAIL") !== 0; }),
@@ -318,6 +322,10 @@ $("clear").addEventListener("click", function () {
   T.forEach(function (t) { paintRow(t.id); }); paintCounts(); go(idx); toast("Results cleared");
 });
 
+$("alone").addEventListener("click", function () {
+  var url = URL.createObjectURL(new Blob([pageOf(T[idx], variant())], { type: "text/html" }));
+  if (!window.open(url, "_blank")) toast("The browser blocked the new tab.");
+});
 var start = byId((location.hash || "").slice(1)); if (start < 0) start = byId(store.last); if (start < 0) start = 0;
 go(start);
 })();
@@ -325,7 +333,7 @@ go(start);
 </body>
 </html>
 `;
-const out = PREVIEW ? path.join(here, "next", "index.html") : path.join(here, "index.html");
+const out = process.env.OUT || path.join(here, "..", "index.html");
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, html);
 console.log(out, html.length, "bytes");
