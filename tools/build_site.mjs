@@ -128,8 +128,10 @@ ${BANNER}
   <details class="lab" id="lab">
     <summary>Design lab: play button</summary>
     <p class="muted">Try other values for the page's button settings (its stylesheet's --play-min, --play-max and --play-target). The button is drawn at the art's own size for it (the card's play anchor, in card units, times the card's scale on this screen), kept between the minimum and the maximum: set both to the same value for a fixed size. Each change reloads this track's player. Changed values are not the shipped page, and the banner above the player says so.</p>
-    <label class="slider"><span>Minimum diameter: <b id="vmin"></b></span><input type="range" id="lmin" min="16" max="64" step="1"></label>
-    <label class="slider"><span>Maximum diameter: <b id="vmax"></b></span><input type="range" id="lmax" min="32" max="200" step="2"></label>
+    <label class="slider"><span>Fixed diameter: <b id="vfix"></b></span><input type="range" id="lfix" min="12" max="64" step="1"></label>
+    <p class="muted" style="margin:0">Or let it follow the art, between a minimum and a maximum:</p>
+    <label class="slider"><span>Minimum diameter: <b id="vmin"></b></span><input type="range" id="lmin" min="12" max="64" step="1"></label>
+    <label class="slider"><span>Maximum diameter: <b id="vmax"></b></span><input type="range" id="lmax" min="12" max="200" step="1"></label>
     <label class="slider"><span>Touch target: <b id="vtarget"></b></span><input type="range" id="ltarget" min="24" max="64" step="1"></label>
     <p class="muted" id="lnow" aria-live="polite"></p>
     <button id="lreset">Reset to the shipped settings</button>
@@ -347,7 +349,8 @@ $("clear").addEventListener("click", function () {
 function paintLab() {
   if (!SHIP) { $("lab").hidden = true; return; }
   var l = store.lab || SHIP;
-  $("lmin").value = l.min; $("lmax").value = l.max; $("ltarget").value = l.target;
+  $("lmin").value = l.min; $("lmax").value = l.max; $("ltarget").value = l.target; $("lfix").value = l.min;
+  $("vfix").textContent = l.min === l.max ? l.min + " px" + (SHIP.min === SHIP.max && l.min === SHIP.min ? " (shipped)" : "") : "off (follows the art)";
   $("vmin").textContent = l.min + " px" + (l.min === SHIP.min ? " (shipped)" : "");
   $("vmax").textContent = l.max + " px" + (l.max === SHIP.max ? " (shipped)" : "");
   $("vtarget").textContent = l.target + " px" + (l.target === SHIP.target ? " (shipped)" : "");
@@ -360,7 +363,7 @@ function paintNow() {
   if (!SHIP || !frame) return;
   var S = +((D.meta.playAnchor || "").split(/[\\s,]+/)[2]), r = frame.getBoundingClientRect(), k = Math.min(r.width / 250, r.height / 350);
   var l = labValues(), art = S * k, d = Math.min(l.max, Math.max(l.min, art));
-  var why = art < l.min ? "raised to the minimum" : art > l.max ? "capped at the maximum" : "the art's size, inside the limits";
+  var why = l.min === l.max ? "fixed" : art < l.min ? "raised to the minimum" : art > l.max ? "capped at the maximum" : "the art's size, inside the limits";
   $("lnow").textContent = S > 0 ? "On this screen: the card is drawn at " + k.toFixed(2) + "x (frame " + Math.round(r.width) + " x " + Math.round(r.height) + " px), so the art asks for " + S + " units x " + k.toFixed(2) + " = " + art.toFixed(1) + " px. The button is " + Math.round(d) + " px (" + why + "), with a " + Math.max(l.target, Math.round(d)) + " px touch target." : "";
 }
 window.addEventListener("resize", paintNow);
@@ -369,6 +372,8 @@ function labValues() { var mn = +$("lmin").value, mx = +$("lmax").value; if (mx 
   $(id).addEventListener("input", function () { var keep = store.lab; store.lab = labValues(); paintLab(); store.lab = keep; });
   $(id).addEventListener("change", function () { store.lab = labValues(); if (!labOn()) store.lab = null; save(); paintLab(); mountFrame(T[idx]); });
 });
+$("lfix").addEventListener("input", function () { $("lmin").value = $("lmax").value = this.value; var keep = store.lab; store.lab = labValues(); paintLab(); store.lab = keep; });
+$("lfix").addEventListener("change", function () { $("lmin").value = $("lmax").value = this.value; store.lab = labValues(); if (!labOn()) store.lab = null; save(); paintLab(); mountFrame(T[idx]); });
 $("lreset").addEventListener("click", function () { store.lab = null; save(); paintLab(); mountFrame(T[idx]); });
 paintLab();
 $("alone").addEventListener("click", function () {
