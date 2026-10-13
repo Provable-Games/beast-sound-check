@@ -7,7 +7,7 @@ Open https://provable-games.github.io/beast-sound-check/ on your phone.
 - **`/`**: player 0.7.0 (engine: [pocket-synth](https://github.com/Provable-Games/pocket-synth) v2.0.1). Each track is the complete `animation_url` page of onchain-midi-player's reference Beast consumer ([`examples/beast_consumer`](https://github.com/Provable-Games/onchain-midi-player/tree/main/examples/beast_consumer)). The NFT owns the controls (play and pause), art sync (inline SVG seeked to the music), background audio and media-session controls. Each page is round-tripped through the spliced `token_uri` and passes the player's `validate_token_uri`.
 - **`/old/`**: the previous build (player 0.3.0, `origin/main 500da1b`), kept for A/B listening. Its results are stored separately.
 
-The art is the Beasts V3 card with each species' genesis GIF, plus a "Synced" variant: the GIF as a PNG sprite sheet stepped on the beat by SMIL. That variant simulates [beasts-v3#132](https://github.com/Provable-Games/beasts-v3/issues/132); the shipped renderer still embeds the GIF.
+The art is the Beasts V3 card with each species' genesis GIF, plus a "Synced" variant: the GIF as a PNG sprite sheet stepped on the beat by SMIL. Each card carries `data-play-anchor="235 58 18 top-right"`: the play button sits at the art frame's top-right corner, 18 card units across (proportional to the card, within the page's 16–128 px limits). That variant simulates [beasts-v3#132](https://github.com/Provable-Games/beasts-v3/issues/132); the shipped renderer still embeds the GIF.
 
 ## Rebuild
 

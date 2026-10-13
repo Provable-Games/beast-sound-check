@@ -128,6 +128,7 @@ ${BANNER}
   <details class="lab" id="lab">
     <summary>Design lab: play button</summary>
     <p class="muted">Try other values for the page's button settings (its stylesheet's --play-min, --play-max and --play-target). The button is drawn at the art's own size for it (the card's play anchor, in card units, times the card's scale on this screen), kept between the minimum and the maximum: set both to the same value for a fixed size. Each change reloads this track's player. Changed values are not the shipped page, and the banner above the player says so.</p>
+    <label class="slider"><span>Proportion (the art's anchor diameter): <b id="vs"></b></span><input type="range" id="ls" min="8" max="40" step="1"></label>
     <label class="slider"><span>Fixed diameter: <b id="vfix"></b></span><input type="range" id="lfix" min="12" max="64" step="1"></label>
     <p class="muted" style="margin:0">Or let it follow the art, between a minimum and a maximum:</p>
     <label class="slider"><span>Minimum diameter: <b id="vmin"></b></span><input type="range" id="lmin" min="12" max="64" step="1"></label>
@@ -174,18 +175,26 @@ var D = JSON.parse(document.getElementById("data").textContent);
 var T = D.tracks, F = D.fixed, KEY = "beast-sound-check-${V}-v1";
 // the page as consumerPieces composed it: fixed fragments, this track's art and D, and its alignment whitespace
 function pageOf(t, v) { var p = t.pages[v], sp = function (n) { return new Array(9 * n + 1).join(" "); };
-  return F.head + labStyle() + sp(p.ws[0]) + F.gunzip + sp(p.ws[1]) + F.player + F.body + p.art + t.d + sp(p.ws[2]) + F.footer; }
+  return F.head + labStyle() + sp(p.ws[0]) + F.gunzip + sp(p.ws[1]) + F.player + F.body + labArt(p.art) + t.d + sp(p.ws[2]) + F.footer; }
 function variant() { return store.art === "gif" ? 0 : store.card ? 2 : 1; }
 var store = { r: {}, g: {}, last: "", art: "synced", card: false, lab: null, v: 1 };
 // The page's own button settings, as shipped (the head stylesheet's :root custom properties)
 var SHIP = (function () { var o = {}, ok = true; ["min", "max", "target"].forEach(function (k) {
-  var m = new RegExp("--play-" + k + ":([0-9.]+)px").exec(F.head); if (m) o[k] = +m[1]; else ok = false; }); return ok ? o : null; })();
-function labOn() { return !!(SHIP && store.lab && (store.lab.min !== SHIP.min || store.lab.max !== SHIP.max || store.lab.target !== SHIP.target)); }
-function labText() { var l = store.lab; return "minimum " + l.min + " px, maximum " + l.max + " px, touch target " + l.target + " px"; }
+  var m = new RegExp("--play-" + k + ":([0-9.]+)px").exec(F.head); if (m) o[k] = +m[1]; else ok = false; });
+  o.s = +((D.meta.playAnchor || "").split(/[\\s,]+/)[2]); if (!(o.s > 0)) ok = false; return ok ? o : null; })();
+function labOn() { return !!(SHIP && store.lab && (store.lab.min !== SHIP.min || store.lab.max !== SHIP.max || store.lab.target !== SHIP.target || store.lab.s !== SHIP.s)); }
+function labText() { var l = store.lab; return "anchor diameter " + l.s + " card units, minimum " + l.min + " px, maximum " + l.max + " px, touch target " + l.target + " px"; }
+// The proportion lives in the art (its data-play-anchor S), so the lab re-encodes this track's art with another S
+function labArt(art) {
+  if (!labOn() || store.lab.s === SHIP.s) return art;
+  var m = /src="data:image\\/svg\\+xml;base64,([^"]+)"/.exec(art); if (!m) return art;
+  var svg = atob(m[1]).replace(/(data-play-anchor="[0-9.]+ [0-9.]+ )[0-9.]+/, "$1" + store.lab.s);
+  return '<img id="beast-art" alt="" src="data:image/svg+xml;base64,' + btoa(svg) + '">';
+}
 function labStyle() { if (!labOn()) return ""; var l = store.lab;
   return '<style id="sound-check-lab">:root{--play-min:' + l.min + 'px;--play-max:' + l.max + 'px;--play-target:' + l.target + "px}</style>"; }
 try { var raw = localStorage.getItem(KEY); if (raw) { var o = JSON.parse(raw); if (o && typeof o === "object") { store.r = o.r || {}; store.g = o.g || {}; store.last = o.last || ""; store.art = o.art === "gif" ? "gif" : "synced";
-  if (o.lab && typeof o.lab === "object" && [o.lab.min, o.lab.max, o.lab.target].every(function (x) { return typeof x === "number" && x > 0; })) store.lab = { min: o.lab.min, max: o.lab.max, target: o.lab.target }; store.card = !!o.card;
+  if (o.lab && typeof o.lab === "object" && [o.lab.min, o.lab.max, o.lab.target, o.lab.s].every(function (x) { return typeof x === "number" && x > 0; })) store.lab = { min: o.lab.min, max: o.lab.max, target: o.lab.target, s: o.lab.s }; store.card = !!o.card;
 } } } catch (e) {}
 function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} }
 save();
@@ -349,7 +358,8 @@ $("clear").addEventListener("click", function () {
 function paintLab() {
   if (!SHIP) { $("lab").hidden = true; return; }
   var l = store.lab || SHIP;
-  $("lmin").value = l.min; $("lmax").value = l.max; $("ltarget").value = l.target; $("lfix").value = l.min;
+  $("lmin").value = l.min; $("lmax").value = l.max; $("ltarget").value = l.target; $("lfix").value = l.min; $("ls").value = l.s;
+  $("vs").textContent = l.s + " card units (" + (l.s / 2.5).toFixed(1) + "% of the card's width)" + (l.s === SHIP.s ? " (shipped)" : "");
   $("vfix").textContent = l.min === l.max ? l.min + " px" + (SHIP.min === SHIP.max && l.min === SHIP.min ? " (shipped)" : "") : "off (follows the art)";
   $("vmin").textContent = l.min + " px" + (l.min === SHIP.min ? " (shipped)" : "");
   $("vmax").textContent = l.max + " px" + (l.max === SHIP.max ? " (shipped)" : "");
@@ -361,14 +371,14 @@ function paintLab() {
 // (the art fills the frame as object-fit: contain does, 250 x 350 units), clamped to the limits
 function paintNow() {
   if (!SHIP || !frame) return;
-  var S = +((D.meta.playAnchor || "").split(/[\\s,]+/)[2]), r = frame.getBoundingClientRect(), k = Math.min(r.width / 250, r.height / 350);
-  var l = labValues(), art = S * k, d = Math.min(l.max, Math.max(l.min, art));
+  var l = labValues(), S = l.s, r = frame.getBoundingClientRect(), k = Math.min(r.width / 250, r.height / 350);
+  var art = S * k, d = Math.min(l.max, Math.max(l.min, art));
   var why = l.min === l.max ? "fixed" : art < l.min ? "raised to the minimum" : art > l.max ? "capped at the maximum" : "the art's size, inside the limits";
   $("lnow").textContent = S > 0 ? "On this screen: the card is drawn at " + k.toFixed(2) + "x (frame " + Math.round(r.width) + " x " + Math.round(r.height) + " px), so the art asks for " + S + " units x " + k.toFixed(2) + " = " + art.toFixed(1) + " px. The button is " + Math.round(d) + " px (" + why + "), with a " + Math.max(l.target, Math.round(d)) + " px touch target." : "";
 }
 window.addEventListener("resize", paintNow);
-function labValues() { var mn = +$("lmin").value, mx = +$("lmax").value; if (mx < mn) mx = mn; return { min: mn, max: mx, target: +$("ltarget").value }; }
-["lmin", "lmax", "ltarget"].forEach(function (id) {
+function labValues() { var mn = +$("lmin").value, mx = +$("lmax").value; if (mx < mn) mx = mn; return { min: mn, max: mx, target: +$("ltarget").value, s: +$("ls").value }; }
+["lmin", "lmax", "ltarget", "ls"].forEach(function (id) {
   $(id).addEventListener("input", function () { var keep = store.lab; store.lab = labValues(); paintLab(); store.lab = keep; });
   $(id).addEventListener("change", function () { store.lab = labValues(); if (!labOn()) store.lab = null; save(); paintLab(); mountFrame(T[idx]); });
 });
