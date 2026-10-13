@@ -1,0 +1,4 @@
+tools/deps/node_modules/
+tools/node_modules/
+tools/tracks*.json
+tools/out/
