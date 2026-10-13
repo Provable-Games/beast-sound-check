@@ -135,9 +135,9 @@ export function card({ beast, art, tempoUs, mode, cardSync = false, strings, med
     sub(/(attributeName='opacity' dur=)'2.2s'/, `$1'${sec(tempoUs * 4)}s'`);
     sub(/(attributeName='opacity' values='0.6;1;0.6' )dur='3s'/, `$1dur='${sec(tempoUs * 8)}s'`);
   }
-  // the top-right corner of the black art frame (rect x=15 y=58 220x144 in the 250x350 card) and a button diameter of 18 card units
-  // (7.2% of the card's width: about 17 px on a phone-sized card, 32 px on a desktop-sized one): where a player may put its play button
-  sub(/^<svg /, () => `<svg data-play-anchor="235 58 18 top-right" `);
+  // the top-right corner of the black art frame (rect x=15 y=58 220x144 in the 250x350 card) and a button diameter of 24 card units
+  // (9.6% of the card's width: about 22 px on a phone-sized card, 40 px on a desktop-sized one): where a player may put its play button
+  sub(/^<svg /, () => `<svg data-play-anchor="235 58 24 top-right" `);
   // a <title> is what navigator.mediaSession shows (player 0.4.0); the real card has none yet, so previews add one
   if (mediaTitle) sub(/^(<svg [^>]*>)/, (m, open) => `${open}<title>${esc(mediaTitle)}</title>`);
   return s;
