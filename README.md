@@ -4,8 +4,7 @@ A phone-first listening test for the onchain MIDI player ([onchain-midi-player](
 
 Open https://provable-games.github.io/beast-sound-check/ on your phone.
 
-- **`/`**: player 0.7.0 (engine: [pocket-synth](https://github.com/Provable-Games/pocket-synth) v2.0.1). Each track is the complete `animation_url` page of onchain-midi-player's reference Beast consumer ([`examples/beast_consumer`](https://github.com/Provable-Games/onchain-midi-player/tree/main/examples/beast_consumer)). The NFT owns the controls (play and pause), art sync (inline SVG seeked to the music), background audio and media-session controls. Each page is round-tripped through the spliced `token_uri` and passes the player's `validate_token_uri`.
-- **`/old/`**: the previous build (player 0.3.0, `origin/main 500da1b`), kept for A/B listening. Its results are stored separately.
+It runs player 0.7.0 (engine: [pocket-synth](https://github.com/Provable-Games/pocket-synth) v2.0.1). Each track is the complete `animation_url` page of onchain-midi-player's reference Beast consumer ([`examples/beast_consumer`](https://github.com/Provable-Games/onchain-midi-player/tree/main/examples/beast_consumer)). The NFT owns the controls (play and pause), art sync (inline SVG seeked to the music), background audio and media-session controls. Each page is round-tripped through the spliced `token_uri` and passes the player's `validate_token_uri`.
 
 The art is the Beasts V3 card with each species' genesis GIF, plus a "Synced" variant: the GIF as a PNG sprite sheet stepped on the beat by SMIL. Each card carries `data-play-anchor="235 58 24 top-right"`: the play button sits at the art frame's top-right corner, 24 card units across (proportional to the card, within the page's 16–128 px limits). That variant simulates [beasts-v3#132](https://github.com/Provable-Games/beasts-v3/issues/132); the shipped renderer still embeds the GIF.
 
@@ -64,7 +63,7 @@ The engine is [pocket-synth](https://github.com/Provable-Games/pocket-synth). on
 
    `bankFail` lists client-bank presets the beast-sound engine can't map yet (three AM-modulator presets as of 2026-10). They are reported, not errors.
 
-   If the player `VERSION` changed and you want to A/B against the outgoing page, run `cp index.html old/index.html` before building. Saved results are stored per player version, so a new version starts with a clean sheet.
+   If the player `VERSION` changed and you want to A/B against the outgoing page, run `mkdir -p old && cp index.html old/index.html` before building, which serves the outgoing page at `/old/`. Saved results are stored per player version, so a new version starts with a clean sheet.
 
 4. **Smoke-test** in Chromium and WebKit at phone size. Expect every check to pass in both:
 
