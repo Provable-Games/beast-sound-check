@@ -194,6 +194,28 @@ await page.uncheck("#cardSync");
   await f.click("#play");
 }
 
+// ---- design lab: the page's button settings, overridden in the frame only, flagged and reset
+{
+  await page.evaluate(() => { const b = Array.from(document.querySelectorAll(".trk")).find((x) => x.querySelector(".id").textContent === "2.01"); b.closest("details").open = true; b.click(); });
+  const btn = async () => { await page.waitForTimeout(300); const f = await (await page.locator("iframe").elementHandle()).contentFrame(); await f.waitForSelector("#play:not([disabled])"); await page.waitForTimeout(200);
+    return f.evaluate(() => { const b = document.getElementById("play").getBoundingClientRect(), x = b.left - 6, y = (b.top + b.bottom) / 2; return { d: Math.round(b.width), lab: !!document.getElementById("sound-check-lab"), hit6: document.elementFromPoint(x, y) === document.getElementById("play") }; }); };
+  const ship = await btn();
+  const set = (id, v) => page.evaluate(([id, v]) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event("input")); e.dispatchEvent(new Event("change")); }, [id, v]);
+  await page.evaluate(() => { document.getElementById("lab").open = true; });
+  await set("lmin", 24); await set("ltarget", 56);
+  const lab = await btn();
+  const badge = await page.evaluate(() => !document.getElementById("labbadge").hidden && document.getElementById("labbadge").textContent);
+  // the export goes to the clipboard when allowed, else to the box: capture either
+  await page.evaluate(() => { try { if (navigator.clipboard) navigator.clipboard.writeText = (t) => { window.__clip = t; return Promise.resolve(); }; } catch (e) {} });
+  await page.click("#export"); await page.waitForTimeout(200);
+  const exp = await page.evaluate(() => window.__clip || document.getElementById("exporttext").value);
+  ok("design lab overrides the button settings in the frame, flagged", !ship.lab && lab.lab && lab.d === 24 && lab.hit6 && /not the shipped page/.test(badge || ""), `shipped ${ship.d} px, lab ${lab.d} px (target 56 px reaches 6 px outside: ${lab.hit6}), badge: ${badge}`);
+  ok("export names the lab override", /Design lab override \(not the shipped page\): minimum 24 px/.test(exp));
+  await page.click("#lreset");
+  const back = await btn();
+  ok("reset returns to the shipped page", !back.lab && back.d === ship.d && (await page.evaluate(() => document.getElementById("labbadge").hidden)), `${back.d} px`);
+}
+
 ok("no console errors", errors.length === 0, errors.slice(0, 3).join(" | "));
 ok("no network requests", requests.length === 0, requests.slice(0, 3).join(" | "));
 await browser.close();

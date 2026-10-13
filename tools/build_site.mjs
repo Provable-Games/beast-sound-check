@@ -90,6 +90,9 @@ textarea{width:100%;min-height:76px;margin-top:10px;padding:10px;border-radius:1
 #exportbox{display:none}
 #exportbox textarea{min-height:220px;font:13px/1.35 ui-monospace,Menlo,Consolas,monospace}
 .err{color:var(--fail)}
+.lab{margin:12px 0;padding:10px 12px;border:1px dashed var(--line);border-radius:10px}.lab>summary{cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:center}
+.slider{display:flex;flex-direction:column;gap:4px;margin:10px 0}.slider input{width:100%;min-height:32px}
+.labbadge{margin:8px 0 0;padding:8px 10px;border-radius:10px;border:1px solid var(--warn);color:var(--warn);font-size:14px;font-weight:600}
 .banner{margin:12px 0 0;padding:10px 12px;border-radius:10px;border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent);font-weight:600}
 .bgblock{padding:12px 0 2px;border-top:1px solid var(--line)}
 </style>
@@ -113,6 +116,7 @@ ${BANNER}
   <div class="kicker" id="kick"></div>
   <h2 id="ttl"></h2>
   <p class="muted" id="blurb"></p>
+  <div class="labbadge" id="labbadge" role="note" hidden></div>
   <div class="playerwrap" id="pw"></div>
   <div class="row artrow" role="group" aria-label="Art variant">
     <button id="aGif" aria-pressed="false">Art: original GIF</button>
@@ -121,6 +125,14 @@ ${BANNER}
   <label class="cardsync"><input type="checkbox" id="cardSync"><span>Card synced (rim 16 beats, pulse 4 beats, logo 8 beats; Synced art only)</span></label>
   <p class="muted" id="artinfo"></p>
   <p class="hint">Tap the play button on the card. Only this track's player is loaded. Marketplaces show animation_url in a sandboxed frame like this one; <button id="alone" class="linkish">open this page on its own</button> to test it as a top-level page (background audio and lock-screen controls can differ).</p>
+  <details class="lab" id="lab">
+    <summary>Design lab: play button</summary>
+    <p class="muted">Try other values for the page's button settings (its stylesheet's --play-min, --play-max and --play-target). Each change reloads this track's player. Changed values are not the shipped page, and the banner above the player says so.</p>
+    <label class="slider"><span>Minimum diameter: <b id="vmin"></b></span><input type="range" id="lmin" min="16" max="64" step="1"></label>
+    <label class="slider"><span>Maximum diameter: <b id="vmax"></b></span><input type="range" id="lmax" min="32" max="200" step="2"></label>
+    <label class="slider"><span>Touch target: <b id="vtarget"></b></span><input type="range" id="ltarget" min="24" max="64" step="1"></label>
+    <button id="lreset">Reset to the shipped settings</button>
+  </details>
   <h3 style="font-size:16px;margin:12px 0 0">Listen for</h3>
   <ul class="checks" id="checks"></ul>
   <div class="rate row" style="margin-top:12px">
@@ -159,10 +171,18 @@ var D = JSON.parse(document.getElementById("data").textContent);
 var T = D.tracks, F = D.fixed, KEY = "beast-sound-check-${V}-v1";
 // the page as consumerPieces composed it: fixed fragments, this track's art and D, and its alignment whitespace
 function pageOf(t, v) { var p = t.pages[v], sp = function (n) { return new Array(9 * n + 1).join(" "); };
-  return F.head + sp(p.ws[0]) + F.gunzip + sp(p.ws[1]) + F.player + F.body + p.art + t.d + sp(p.ws[2]) + F.footer; }
+  return F.head + labStyle() + sp(p.ws[0]) + F.gunzip + sp(p.ws[1]) + F.player + F.body + p.art + t.d + sp(p.ws[2]) + F.footer; }
 function variant() { return store.art === "gif" ? 0 : store.card ? 2 : 1; }
-var store = { r: {}, g: {}, last: "", art: "synced", card: false, v: 1 };
-try { var raw = localStorage.getItem(KEY); if (raw) { var o = JSON.parse(raw); if (o && typeof o === "object") { store.r = o.r || {}; store.g = o.g || {}; store.last = o.last || ""; store.art = o.art === "gif" ? "gif" : "synced"; store.card = !!o.card;
+var store = { r: {}, g: {}, last: "", art: "synced", card: false, lab: null, v: 1 };
+// The page's own button settings, as shipped (the head stylesheet's :root custom properties)
+var SHIP = (function () { var o = {}, ok = true; ["min", "max", "target"].forEach(function (k) {
+  var m = new RegExp("--play-" + k + ":([0-9.]+)px").exec(F.head); if (m) o[k] = +m[1]; else ok = false; }); return ok ? o : null; })();
+function labOn() { return !!(SHIP && store.lab && (store.lab.min !== SHIP.min || store.lab.max !== SHIP.max || store.lab.target !== SHIP.target)); }
+function labText() { var l = store.lab; return "minimum " + l.min + " px, maximum " + l.max + " px, touch target " + l.target + " px"; }
+function labStyle() { if (!labOn()) return ""; var l = store.lab;
+  return '<style id="sound-check-lab">:root{--play-min:' + l.min + 'px;--play-max:' + l.max + 'px;--play-target:' + l.target + "px}</style>"; }
+try { var raw = localStorage.getItem(KEY); if (raw) { var o = JSON.parse(raw); if (o && typeof o === "object") { store.r = o.r || {}; store.g = o.g || {}; store.last = o.last || ""; store.art = o.art === "gif" ? "gif" : "synced";
+  if (o.lab && typeof o.lab === "object" && [o.lab.min, o.lab.max, o.lab.target].every(function (x) { return typeof x === "number" && x > 0; })) store.lab = { min: o.lab.min, max: o.lab.max, target: o.lab.target }; store.card = !!o.card;
 } } } catch (e) {}
 function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} }
 save();
@@ -297,7 +317,8 @@ function summary() {
   });
   var g = Object.keys(store.g).filter(function (k) { return store.g[k]; });
   var out = ["Beast Sound Check results", new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC", navigator.userAgent,
-    "Player " + meta.playerVersion + ", " + meta.ompCommit + "; music " + meta.beastCommit + "; built " + (meta.generated || "").slice(0, 16), "",
+    "Player " + meta.playerVersion + ", " + meta.ompCommit + "; music " + meta.beastCommit + "; built " + (meta.generated || "").slice(0, 16),
+    labOn() ? "Design lab override (not the shipped page): " + labText() : "Play button: shipped settings", "",
     "Pass " + pass + ", fail " + fail + ", untested " + (T.length - pass - fail) + " of " + T.length,
     "Global checklist ticked: " + (g.length ? g.join(", ") : "none"), ""];
   return out.concat(lines.filter(function (l) { return l.indexOf("FAIL") === 0; }), lines.filter(function (l) { return l.indexOf("FAIL") !== 0; }),
@@ -322,6 +343,22 @@ $("clear").addEventListener("click", function () {
   T.forEach(function (t) { paintRow(t.id); }); paintCounts(); go(idx); toast("Results cleared");
 });
 
+function paintLab() {
+  if (!SHIP) { $("lab").hidden = true; return; }
+  var l = store.lab || SHIP;
+  $("lmin").value = l.min; $("lmax").value = l.max; $("ltarget").value = l.target;
+  $("vmin").textContent = l.min + " px" + (l.min === SHIP.min ? " (shipped)" : "");
+  $("vmax").textContent = l.max + " px" + (l.max === SHIP.max ? " (shipped)" : "");
+  $("vtarget").textContent = l.target + " px" + (l.target === SHIP.target ? " (shipped)" : "");
+  var b = $("labbadge"); b.hidden = !labOn(); b.textContent = labOn() ? "Design lab override, not the shipped page: " + labText() + "." : "";
+}
+function labValues() { var mn = +$("lmin").value, mx = +$("lmax").value; if (mx < mn) mx = mn; return { min: mn, max: mx, target: +$("ltarget").value }; }
+["lmin", "lmax", "ltarget"].forEach(function (id) {
+  $(id).addEventListener("input", function () { var keep = store.lab; store.lab = labValues(); paintLab(); store.lab = keep; });
+  $(id).addEventListener("change", function () { store.lab = labValues(); if (!labOn()) store.lab = null; save(); paintLab(); mountFrame(T[idx]); });
+});
+$("lreset").addEventListener("click", function () { store.lab = null; save(); paintLab(); mountFrame(T[idx]); });
+paintLab();
 $("alone").addEventListener("click", function () {
   var url = URL.createObjectURL(new Blob([pageOf(T[idx], variant())], { type: "text/html" }));
   if (!window.open(url, "_blank")) toast("The browser blocked the new tab.");
