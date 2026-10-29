@@ -13,17 +13,46 @@ const json = JSON.stringify(data).replace(/</g, "\\u003c").replace(new RegExp("\
 const V = data.meta.playerVersion;
 const BANNER = "";
 // Engine test (opt-in, off by default): injected into the NFT page's head ahead of the engine. It sets the
-// AudioContext latency hint and the sequencer lookahead (preroll) for an A/B on a phone, and paints a meter:
-// Chrome's AudioContext.playbackStats underruns where available (Chrome 146+), the longest main-thread stall,
-// and the lookahead in effect. M: { label, hint: true ("playback") | false (default) | null (as shipped), preroll: s | null }.
+// AudioContext latency hint and the sequencer lookahead (preroll) for an A/B on a phone, optionally makes
+// every oscillator's detune AudioParam k-rate, and paints a meter: Chrome's AudioContext.playbackStats
+// underruns where available (Chrome 146+), the longest main-thread stall, and the settings in effect.
+// M: { key, hint: null (as shipped: whatever the engine asks for) | "default" (no options) | "playback" |
+// "balanced" | seconds, preroll: s | null (as shipped), k: true to make detune k-rate }.
+// k-rate: the engine connects the CC1 modulation LFO to every oscillator's detune (chmod[ch].connect(o.detune)),
+// which makes Chromium compute a per-sample exp2 for the phase increment; a k-rate detune computes it once per
+// 128-frame quantum, so vibrato steps every 128 frames (about 2.7 ms at 48 kHz). Only OscillatorNode's detune can
+// change: an AudioBufferSourceNode's detune and playbackRate are k-rate by the spec, so those nodes are
+// wrapped too but read back k-rate in every mode. The engine makes all its nodes through
+// AudioContext.createOscillator and createBufferSource, which the wrapper covers.
 function engineTest(M) {
   "use strict";
   var W = window, R = W.AudioContext || W.webkitAudioContext, box = null;
   if (!R) return;
-  var st = { ctx: null, pre: null, cap: "waiting for audio", now: null, under: 0, first: null, stall: 0, firstStall: null };
+  var st = { ctx: null, pre: null, cap: "waiting for audio", now: null, under: 0, first: null, stall: 0, firstStall: null,
+    hint: "?", ko: 0, kb: 0, kfail: 0, kread: null, dread: null };
+  var makeOsc = R.prototype.createOscillator;
+  function kRate(n, kind) {
+    try { n.detune.automationRate = "k-rate"; st[kind]++; if (kind === "ko" && st.kread === null) st.kread = n.detune.automationRate; }
+    catch (e) { st.kfail++; }
+    return n;
+  }
+  if (M.k) [["createOscillator", "ko"], ["createBufferSource", "kb"]].forEach(function (x) {
+    var f = R.prototype[x[0]];
+    if (typeof f === "function") R.prototype[x[0]] = function () { return kRate(f.apply(this, arguments), x[1]); };
+  });
   function A(o) {
-    var c = M.hint === null ? (o === undefined ? new R() : new R(o)) : M.hint ? new R({ latencyHint: "playback" }) : new R();
-    if (!st.ctx) { st.ctx = c; watch(c); }
+    var c;
+    if (M.hint === null) { c = o === undefined ? new R() : new R(o); st.hint = o && o.latencyHint !== undefined ? o.latencyHint + " (the engine's own)" : "default"; }
+    else if (M.hint === "default") { c = new R(); st.hint = "default"; }
+    else {
+      try { c = new R({ latencyHint: M.hint }); st.hint = M.hint + (typeof M.hint === "number" ? " s" : ""); }
+      catch (e) { c = new R(); st.hint = "default (" + M.hint + " was rejected)"; }
+    }
+    if (!st.ctx) {
+      st.ctx = c; watch(c);
+      // the detune rate a plain oscillator has here (not through the k-rate wrapper)
+      try { st.dread = makeOsc.call(c).detune.automationRate; } catch (e) { /* no automationRate */ }
+    }
     return c;
   }
   A.prototype = R.prototype;
@@ -46,7 +75,12 @@ function engineTest(M) {
     }, 100);
   }
   function ms(x) { return typeof x === "number" ? (x * 1000).toFixed(1) + " ms" : "n/a"; }
-  function pct(x) { return typeof x === "number" ? Math.round(x * 100) + "%" : "n/a"; }
+  function detuneLine() {
+    if (!M.k) return "detune rate: " + (typeof st.dread === "string" ? st.dread + " (the default, not changed)" : "n/a (no automationRate in this browser)");
+    var n = st.ko + st.kb;
+    return "detune rate: k-rate requested; set on " + st.ko + " oscillators, " + st.kb + " buffer sources" + (st.kfail ? ", " + st.kfail + " failed" : "") +
+      (st.kread !== null ? "; an engine oscillator reads back " + st.kread : n || st.kfail ? "" : "; no node made yet");
+  }
   function paint() {
     if (!document.body) return;
     if (!box) {
@@ -56,10 +90,13 @@ function engineTest(M) {
     }
     var c = st.ctx;
     box.textContent = [
-      "engine test: " + M.label,
+      "engine test: " + M.key,
       c ? "audio clock " + c.currentTime.toFixed(1) + " s, " + c.state + ", " + c.sampleRate + " Hz" : "audio not started",
-      c ? "base latency " + ms(c.baseLatency) + ", output latency " + ms(c.outputLatency) : "",
+      c ? "latency hint " + st.hint : "",
+      c ? "base latency " + ms(c.baseLatency) + (typeof c.baseLatency === "number" ? " = " + Math.round(c.baseLatency * c.sampleRate) + " frames" : "") : "",
+      c ? "output latency " + ms(c.outputLatency) : "",
       "lookahead " + (st.pre === null ? "?" : st.pre + " s"),
+      c ? detuneLine() : "",
       "underruns: " + (st.cap === "on" ? st.under + " (" + ms(st.now) + " in all)" : st.cap),
       st.cap === "on" ? "first underrun " + (st.first === null ? "none" : "at about " + st.first.toFixed(1) + " s") : "",
       "longest main-thread stall " + Math.round(st.stall) + " ms" + (st.firstStall === null ? "" : ", first over 150 ms at " + st.firstStall.toFixed(1) + " s"),
@@ -187,6 +224,11 @@ ${BANNER}
     <option value="big02">Large buffer, 0.2 s lookahead</option>
     <option value="def1">Default buffer, 1 s lookahead</option>
     <option value="def02">Default buffer, 0.2 s lookahead (v2.0.1 on a phone)</option>
+    <option value="bal1">Balanced hint, 1 s lookahead</option>
+    <option value="n02_1">Latency hint 0.02 s, 1 s lookahead</option>
+    <option value="n05_1">Latency hint 0.05 s, 1 s lookahead</option>
+    <option value="def1k">Default buffer, 1 s lookahead, k-rate detune</option>
+    <option value="n05_1k">Latency hint 0.05 s, 1 s lookahead, k-rate detune</option>
   </select></label>
   <p class="muted" id="etestinfo"></p>
   <p class="muted" id="artinfo"></p>
@@ -244,10 +286,12 @@ function pageOf(t, v) { var p = t.pages[v], sp = function (n) { return new Array
   return F.head + labStyle() + engineTest() + sp(p.ws[0]) + F.gunzip + sp(p.ws[1]) + F.player + F.body + labArt(p.art) + t.d + sp(p.ws[2]) + (F.notes ? F.notes + sp(p.ws[3]) : "") + F.footer; }
 function variant() { return store.art === "gif" ? 0 : store.card ? 2 : 1; }
 var ENGINE_TEST = ${JSON.stringify(ENGINE_TEST)};
-var TESTS = { meter: { hint: null, preroll: null }, big1: { hint: true, preroll: 1 }, big02: { hint: true, preroll: 0.2 }, def1: { hint: false, preroll: 1 }, def02: { hint: false, preroll: 0.2 } };
+var TESTS = { meter: { hint: null, preroll: null }, big1: { hint: "playback", preroll: 1 }, big02: { hint: "playback", preroll: 0.2 },
+  def1: { hint: "default", preroll: 1 }, def02: { hint: "default", preroll: 0.2 },
+  bal1: { hint: "balanced", preroll: 1 }, n02_1: { hint: 0.02, preroll: 1 }, n05_1: { hint: 0.05, preroll: 1 },
+  def1k: { hint: "default", preroll: 1, k: true }, n05_1k: { hint: 0.05, preroll: 1, k: true } };
 function engineTest() { var m = TESTS[store.test]; if (!m) return "";
-  var label = $("etest").options[$("etest").selectedIndex].text;
-  return "<script>(" + ENGINE_TEST + ")(" + JSON.stringify({ label: label, hint: m.hint, preroll: m.preroll }) + ");</scr" + "ipt>"; }
+  return "<script>(" + ENGINE_TEST + ")(" + JSON.stringify({ key: store.test, hint: m.hint, preroll: m.preroll, k: !!m.k }) + ");</scr" + "ipt>"; }
 var store = { r: {}, g: {}, last: "", art: "synced", card: false, lab: null, test: "", v: 1 };
 // The page's own button settings, as shipped (the head stylesheet's :root custom properties)
 var SHIP = (function () { var o = {}, ok = true; ["min", "max", "target"].forEach(function (k) {
@@ -371,7 +415,7 @@ $("aGif").addEventListener("click", function () { setArt("gif"); });
 $("aSync").addEventListener("click", function () { setArt("synced"); });
 $("cardSync").addEventListener("change", function () { setArt(undefined, $("cardSync").checked); });
 // Engine test: ?test=<mode> in the URL selects one too (for a link to send).
-(function () { var q = /[?&]test=([a-z0-9]+)/.exec(location.search); if (q && TESTS[q[1]]) store.test = q[1]; })();
+(function () { var q = /[?&]test=([a-z0-9_]+)/.exec(location.search); if (q && TESTS[q[1]]) store.test = q[1]; })();
 function paintTest() { $("etest").value = store.test; $("etestinfo").textContent = store.test ? "Engine test on: the meter is at the top left of the player. Reload the track after changing the mode (choosing it here does)." : ""; }
 $("etest").addEventListener("change", function () { store.test = TESTS[$("etest").value] ? $("etest").value : ""; save(); paintTest(); mountFrame(T[idx]); });
 paintTest();

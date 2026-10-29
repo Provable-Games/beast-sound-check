@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>k-rate detune ear test</title>
+<style>
+:root{color-scheme:light dark;font:16px/1.45 system-ui,sans-serif}
+body{margin:0 auto;max-width:42rem;padding:1rem 16px 3rem}
+h1{font-size:1.3rem;margin:.2rem 0 .6rem}
+section{border-top:1px solid #8886;margin-top:1.2rem;padding-top:.6rem}
+h2{font-size:1.05rem;margin:.2rem 0}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pair label{display:block;font-weight:600;margin-bottom:2px}
+audio{width:100%}
+details{margin-top:.5rem}
+.muted{opacity:.75;font-size:.9rem}
+@media (max-width:420px){.pair{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<h1>k-rate detune ear test</h1>
+<p>pocket-synth connects the vibrato oscillator (CC1) to every note's detune. Chrome normally recomputes the pitch for each audio sample (a-rate). With a <b>k-rate</b> detune it recomputes it once per 128 frames, which is cheaper, but the pitch then moves in steps 2.7 ms long (48 kHz). Each pair below is the same score through the real engine; one file is a-rate and one k-rate. Which is which is hidden until you open the answer.</p>
+<p><b>How to listen.</b> Use headphones first, then the phone speaker. Play 1, then 2, then 1 again, a few times, and say whether you hear any difference and in which. Keep the volume the same for both. Note the pair, which one you picked, how sure you are, and your phone and Chrome version. If you cannot tell them apart, that is the result.</p>
+<p class="muted">Rendered offline with the Node package node-web-audio-api, not Chrome, dry (no reverb), 48 kHz mono 16-bit, both files of a pair at the same gain. There a connected k-rate detune holds its first input sample for each 128-frame quantum, which is what Chrome's does too, but the oscillator itself is not Chrome's, and a phone's speaker and audio path are not this page's.</p>
+<section id="vib-moderate">
+<h2>Held note, vibrato at moderate depth</h2>
+<p>A held plain sawtooth (A4) with the engine's 5 Hz vibrato at CC1 = 48, about 38 cents each way. Listen for a buzz, roughness or grainy edge on the vibrato in one of the two, especially in the upper harmonics.</p>
+<div class="pair">
+<div><label>1</label><audio controls preload="none" src="vib-moderate-1.wav"></audio></div>
+<div><label>2</label><audio controls preload="none" src="vib-moderate-2.wav"></audio></div>
+</div>
+<details><summary>Answer</summary><p>File 1 is k-rate, file 2 is a-rate.</p></details>
+</section>
+<section id="vib-full">
+<h2>Held note, vibrato at full depth</h2>
+<p>The same note at CC1 = 127, 100 cents each way, the deepest the engine goes. The pitch changes fastest at the vibrato's zero crossings, which is where a staircase would show most.</p>
+<div class="pair">
+<div><label>1</label><audio controls preload="none" src="vib-full-1.wav"></audio></div>
+<div><label>2</label><audio controls preload="none" src="vib-full-2.wav"></audio></div>
+</div>
+<details><summary>Answer</summary><p>File 2 is k-rate, file 1 is a-rate.</p></details>
+</section>
+<section id="bend-sweep">
+<h2>Slow pitch bend sweep</h2>
+<p>The same note glides up two semitones, down to two below its start, then back, as 200 pitch bend messages a second over 3 s. Listen for the glide sounding stepped or rough in one of the two.</p>
+<div class="pair">
+<div><label>1</label><audio controls preload="none" src="bend-sweep-1.wav"></audio></div>
+<div><label>2</label><audio controls preload="none" src="bend-sweep-2.wav"></audio></div>
+</div>
+<details><summary>Answer</summary><p>File 1 is k-rate, file 2 is a-rate.</p></details>
+</section>
+<section id="bell-vibrato">
+<h2>FM bell with vibrato</h2>
+<p>Two struck tubular bells (C5, then G5) with CC1 = 64, about 50 cents each way. The bell's partials are the highest frequencies here, where the same pitch step is the most Hz.</p>
+<div class="pair">
+<div><label>1</label><audio controls preload="none" src="bell-vibrato-1.wav"></audio></div>
+<div><label>2</label><audio controls preload="none" src="bell-vibrato-2.wav"></audio></div>
+</div>
+<details><summary>Answer</summary><p>File 2 is k-rate, file 1 is a-rate.</p></details>
+</section>
+</body>
+</html>
