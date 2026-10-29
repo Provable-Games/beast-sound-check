@@ -100,3 +100,50 @@ The engine is [pocket-synth](https://github.com/Provable-Games/pocket-synth). on
    ```
 
 6. **Remove the worktrees** by running `git worktree remove <path>` in each repo.
+
+## Sepolia rendition sets
+
+`renditions/<deployment>/` holds real Beasts read from a Beasts V3 Sepolia deployment: the raw `token_uri` of one Beast for each of the 75 original species at visual effects 0, 1, 2 and 3 (sound effects equal to visual effects), plus the 75 Genesis Beasts (visual 3, sound 1). Each set is versioned by its deployment (for example `renditions/sepolia-2026-10-29/`) and is never overwritten. The page does not use it yet; the Sound Check will be rebuilt on top of it.
+
+- `manifest.json` (`schemaVersion: 1`): the deployment, the beasts-v3 record and commit, the chain id and the block every read used, the NFT, registry, renderer, art provider and Sound Manager addresses, the TinySynth class and version, the renderer's rainbow and notes masks, and per token: token ID, species, name, identity (prefix and suffix), visual and sound effects, shiny, art (Shiny or Regular GIF), notes, rainbow, the MIDI's tempo, the raw size and the SHA-256 of the raw `token_uri`.
+- `tokens/<token ID>.txt.gz`: the `token_uri` string exactly as the NFT returned it, gzipped (`storage.compression` in the manifest says so; a set under 25 MB would be stored raw). The site opens one with `new Response(file.stream().pipeThrough(new DecompressionStream("gzip"))).text()` and derives everything else from it.
+- Each token's `tracks` is `[]` for now. A later schema version will list the tracks a token holds, one `{ editionId, trackIndex, acquisition }` per track (`manifest.trackEntryShape`), once Sound Manager editions are live on Sepolia; readers of schema 1 ignore it.
+
+The 2026-10-29 set is 375 files, 67.8 MiB raw and 39.7 MiB gzipped: about 179–196 KB raw (103–118 KB gzipped) per token, rising with the preset (the notes fragment and Shiny art). The player and the art in each `token_uri` are already compressed, so gzip saves only about 40%. **Retention:** keep the latest two sets in the tree (the current deployment and the one before, for A/B listening) and remove older ones in the commit that adds a new set; Git history keeps every set.
+
+### Regenerate after a Sepolia deploy
+
+Run these in order after every new Beasts V3 Sepolia deployment. Use worktrees, never someone's working checkout. The RPC URL is private: pass it in a file or an environment variable, and never print or commit it.
+
+1. **Mint the set in beasts-v3** (on a branch from `main` that has the new deployment record), as its `AGENTS.md` describes:
+
+   ```sh
+   cd /workspace/beasts-v3-worktrees/<branch>
+   pnpm install --frozen-lockfile && pnpm build:sdk
+   R=~/.starknet_accounts/onchain_art_sepolia_rpc.private.json
+   node scripts/mint-rendition-set.mjs --record deploy/records/<deployment>.json --rpc-file $R --dry-run
+   node scripts/mint-rendition-set.mjs --record deploy/records/<deployment>.json --rpc-file $R
+   node scripts/mint-rendition-set.mjs --render-doc --record deploy/records/<deployment>.json
+   ```
+
+   It mints only what is missing (it is safe to rerun) and writes `deploy/records/renditions-<deployment>.json`. Commit the record and the doc there.
+
+2. **Read the set here**, from that beasts-v3 checkout:
+
+   ```sh
+   cd /workspace/beast-sound-check-worktrees/<branch>
+   BEASTS3=/workspace/beasts-v3-worktrees/<branch> node tools/sepolia_renditions.mjs --rpc-file $R
+   ```
+
+   It reads the newest `renditions-sepolia-*.json` record (or `--record <path in BEASTS3>`) and writes `renditions/<deployment>/`. It refuses to run if the record disagrees with the chain (any original species' renderer, art provider or Sound Manager, the renderer's TinySynth, or a token that is not live), and every `token_uri` must pass beasts-v3's metadata conformance checks with its exact Shiny or Regular GIF and the renderer's notes mask.
+
+3. **Check it:**
+
+   ```sh
+   BEASTS3=/workspace/beasts-v3-worktrees/<branch> node tools/sepolia_renditions.mjs --verify renditions/<deployment>
+   BEASTS3=... PLAYWRIGHT_CORE=<node_modules/playwright-core> node tools/sepolia_renditions_spot.mjs renditions/<deployment>
+   ```
+
+   The first re-hashes every stored file against the manifest and re-runs the conformance checks offline. The second opens one token per preset in Chromium: the notes fragment only on presets 2 and 3, the Shiny GIF on 1 and 3, the tempo, and a page that loads with no errors and no network requests.
+
+4. **Commit** the new set (and remove the oldest if more than two remain).
