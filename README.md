@@ -1,30 +1,46 @@
 # Beast Sound Check
 
-A phone-first listening test for the onchain MIDI player ([onchain-midi-player](https://github.com/Provable-Games/onchain-midi-player)): Casey Wescott's Beast compositions, every TinyChip preset and drum, and edge cases.
+A phone-first listening test for the onchain MIDI player ([onchain-midi-player](https://github.com/Provable-Games/onchain-midi-player)) in two parts: **real Beasts** from the latest Beasts V3 Sepolia deployment (section 1, "Beasts on Sepolia"), and **engine tests** on onchain-midi-player's reference Beast page (sections 2 to 5: every TinyChip preset and drum, edge cases, stress ramps and the client chip bank).
 
 Open https://provable-games.github.io/beast-sound-check/ on your phone.
 
-It runs player 0.8.0 (engine: [pocket-synth](https://github.com/Provable-Games/pocket-synth) v2.1.0, which asks phones and tablets for a larger audio buffer and a 1 s lookahead). For an A/B on the same device, https://provable-games.github.io/beast-sound-check/old/ is the same build from onchain-midi-player `8b1ff66`, just before the re-pin (player 0.7.0, engine v2.0.1), so the two differ only in the engine.
+The engine tests run player 0.8.0 (engine: [pocket-synth](https://github.com/Provable-Games/pocket-synth) v2.1.0, which asks phones and tablets for a larger audio buffer and a 1 s lookahead). For an A/B on the same device, https://provable-games.github.io/beast-sound-check/old/ is the same build from onchain-midi-player `8b1ff66`, just before the re-pin (player 0.7.0, engine v2.0.1), so the two differ only in the engine. (`/old/` predates section 1: it still has Casey's compositions on the reference page in its place.)
+
+## Section 1: Beasts on Sepolia
+
+Each real Beast is a token's exact `animation_url` page from the newest rendition set in `renditions/` (see [Sepolia rendition sets](#sepolia-rendition-sets)): the deployed TinySynth (0.7.0 for the 2026-10-29 set), the Beasts renderer's card with the token's Shiny or Regular GIF as an isolated `<img>` (no `data-trusted-art`, so it runs on its own clock), the Originals Sound Manager's music, and the notes behind the art on presets 2 and 3 only. The page fetches the set from its own `renditions/<deployment>/` path when it opens (only a summary of each set is in `index.html`), rebuilds the raw `token_uri` with [`tools/rendition_set.mjs`](tools/rendition_set.mjs), checks its length and SHA-256 against the manifest, decodes `token_uri` to the metadata JSON to `animation_url` to the HTML, and loads that, byte for byte, in the same sandboxed frame as the engine tests. A token that fails the check shows an error and does not play. The check needs `crypto.subtle` (the https site or localhost) and `DecompressionStream`; without them the section says so and the engine tests still work.
+
+The picker is the species (all 75, by name) and the variant (its Genesis Beast, or presets 0 to 3, sound effects equal to the preset); the default is the Genesis Warlock, and Prev and Next step through all 375 before the engine tests. Each variant shows its facts (token ID, name, preset, shiny, notes, rainbow, tempo and block) and its own checks. With more than one set in `renditions/`, a selector offers the older ones (the newest, by block, is the default). The list's section 1 has one row per species with its rated variants.
+
+The **Page footer** selector splices another footer fragment into a real Beast's page: **As deployed** (the default: the page untouched, with Beasts' vendored footer, byte-identical to onchain-midi-player `504f231`'s); **Upstream main** (onchain-midi-player `origin/main`'s `examples/beast_consumer/fixtures/footer.html`, the footer the engine tests' reference page runs); and **Pause-freeze PR** ([onchain-midi-player#88](https://github.com/Provable-Games/onchain-midi-player/pull/88), the same file from `origin/feat/pause-freezes-img-art`, which freezes the isolated GIF while the music is paused). The footer is the page's last fragment, so the splice replaces exactly the deployed footer's bytes at the end of the page, and refuses unless they occur exactly once and last. The alternatives are baked into the build with their commits; a non-default footer shows a "not the deployed page" banner. As deployed, the art keeps moving while the music is paused; with the PR footer it holds still and moves again on play.
+
+Each real Beast's result records the set, block, token ID, name, preset, and the page footer it was rated with and its commit; the export lists them under "Beasts on Sepolia", and the engine tests keep their own summary below. Results are keyed by set and token ID, so engine-test results saved before this change still load.
+
+## Engine tests
 
 Track 418, "Stress test: load ramps", is for finding a phone's limits: it ramps the voice count (a heavy 8-operator filtered pad, 4 voices more each second up to 56) and then the note rate (up to 112 notes per second), then both at once, over a steady hi-hat. No voice is ever stolen, so a crackle or stutter is the device falling behind, and its time tells which load and how much. Track 419 is the same with the reverb off (the convolver's share of the load), and track 420 is a phone-sized ramp (up to 24 voices and 64 notes per second) whose ceiling should land mid-track.
 
-The **Engine test** selector under the art (or `?test=<mode>` in the URL, for example `?test=def02#420`) injects a small script into the NFT page, ahead of the engine, that sets the AudioContext latency hint and the sequencer lookahead, and paints a meter at the top left of the player: Chrome's audio underruns (`AudioContext.playbackStats`, Chrome 146 and later), the longest main-thread stall, and the lookahead in effect. Modes: `meter` (as shipped), `big1`, `big02`, `def1`, `def02` (large or default buffer, 1 s or 0.2 s lookahead); and, all with a 1 s lookahead, `bal1` (latency hint "balanced"), `n02_1` and `n05_1` (a hint of 0.02 s and 0.05 s), `def1k` (default hint) and `n05_1k` (0.05 s), the last two with every oscillator's detune AudioParam k-rate. The meter also shows the hint, the base latency in frames and the detune rate in effect. Off by default; with it off, the page is exactly as shipped.
+The **Engine test** selector under the art of an engine test (or `?test=<mode>` in the URL, for example `?test=def02#420`) injects a small script into the NFT page, ahead of the engine, that sets the AudioContext latency hint and the sequencer lookahead, and paints a meter at the top left of the player: Chrome's audio underruns (`AudioContext.playbackStats`, Chrome 146 and later), the longest main-thread stall, and the lookahead in effect. Modes: `meter` (as shipped), `big1`, `big02`, `def1`, `def02` (large or default buffer, 1 s or 0.2 s lookahead); and, all with a 1 s lookahead, `bal1` (latency hint "balanced"), `n02_1` and `n05_1` (a hint of 0.02 s and 0.05 s), `def1k` (default hint) and `n05_1k` (0.05 s), the last two with every oscillator's detune AudioParam k-rate. The meter also shows the hint, the base latency in frames and the detune rate in effect. Off by default; with it off, the page is exactly as shipped.
 
 Why k-rate: the engine connects its CC1 vibrato oscillator to every oscillator's detune, which makes Chrome compute each phase increment per sample (an `exp2` each). A k-rate detune computes it once per 128-frame quantum, which is cheaper, but the vibrato then moves in steps of 128 frames (2.7 ms at 48 kHz). The injected script wraps `AudioContext.createOscillator` and `createBufferSource` to set it (guarded; Firefox has no `automationRate`; a buffer source's detune is k-rate by the spec anyway). Whether the steps are audible is for [samples/k-rate/](https://provable-games.github.io/beast-sound-check/samples/k-rate/), a-rate and k-rate renders of the cases most likely to show them through the real engine, hidden behind an answer, made by `tools/k_rate_samples.mjs`.
 
-Each track is the complete `animation_url` page of onchain-midi-player's reference Beast consumer ([`examples/beast_consumer`](https://github.com/Provable-Games/onchain-midi-player/tree/main/examples/beast_consumer)). The NFT owns the controls (play and pause), art sync (inline SVG seeked to the music), background audio and media-session controls. Each page is round-tripped through the spliced `token_uri` and passes the player's `validate_token_uri`.
+Each engine test is the complete `animation_url` page of onchain-midi-player's reference Beast consumer ([`examples/beast_consumer`](https://github.com/Provable-Games/onchain-midi-player/tree/main/examples/beast_consumer)). The NFT owns the controls (play and pause), art sync (inline SVG seeked to the music), background audio and media-session controls. Each page is round-tripped through the spliced `token_uri` and passes the player's `validate_token_uri`.
 
-The art is the Beasts V3 card as the renderer draws it today (beasts-v3's renderer fixtures), with each species' genesis art. The Beasts rotate through shiny and regular, animated (GIF) and static (PNG); animated ones also have a "Synced" variant: the GIF as a PNG sprite sheet stepped on the beat by SMIL, simulating [beasts-v3#132](https://github.com/Provable-Games/beasts-v3/issues/132). As shipped, a Synced frame lasts an eighth note, or a quarter note above 150 BPM (when an eighth would be under 0.2 s). The **Animation speed** row under the art (or `?speed=<step>` in the URL: `ultraslow`, `slow`, `medium`, `fast`, `ultrafast` or `shipped`) sets one note value per frame for every track: Ultra slow a whole note, Slow a half, Medium a quarter, Fast an eighth, Ultra fast a sixteenth. Until a step is chosen, each track follows the shipped policy (dashed), so the page is as built. The page retimes only the sprite's `<animate>` `dur` from the track's exact tempo (microseconds per quarter note), leaving the card-sync animations alone; the original GIF keeps its own clock as the baseline, and static Beasts have nothing to time. The info line shows the frame length at the chosen step, the shipped step and its frame length, and the GIF's own frame length. Exported results record the art and speed each track was rated with. Every card marks its art frame `data-notes-bg`, so every track draws its own MIDI as a piano roll scrolling behind the Beast ([beasts-v3#218](https://github.com/Provable-Games/beasts-v3/pull/218), onchain-midi-player's notes fragment); production Beasts draw notes only for visual presets 2 and 3. The play button sits at the art frame's top-right corner (`data-play-anchor="235 54 24 top-right"`).
+Its art is the Beasts V3 card template as the renderer draws it (beasts-v3's renderer fixtures), with a species' genesis art; these are not real Beasts. The Beasts rotate through shiny and regular, animated (GIF) and static (PNG); animated ones also have a "Synced" variant: the GIF as a PNG sprite sheet stepped on the beat by SMIL, simulating [beasts-v3#132](https://github.com/Provable-Games/beasts-v3/issues/132). As shipped, a Synced frame lasts an eighth note, or a quarter note above 150 BPM (when an eighth would be under 0.2 s). The **Animation speed** row under the art (or `?speed=<step>` in the URL: `ultraslow`, `slow`, `medium`, `fast`, `ultrafast` or `shipped`) sets one note value per frame for every track: Ultra slow a whole note, Slow a half, Medium a quarter, Fast an eighth, Ultra fast a sixteenth. Until a step is chosen, each track follows the shipped policy (dashed), so the page is as built. The page retimes only the sprite's `<animate>` `dur` from the track's exact tempo (microseconds per quarter note), leaving the card-sync animations alone; the original GIF keeps its own clock as the baseline, and static Beasts have nothing to time. The info line shows the frame length at the chosen step, the shipped step and its frame length, and the GIF's own frame length. Exported results record the art and speed each track was rated with. Every card marks its art frame `data-notes-bg`, so every track draws its own MIDI as a piano roll scrolling behind the Beast ([beasts-v3#218](https://github.com/Provable-Games/beasts-v3/pull/218), onchain-midi-player's notes fragment); production Beasts draw notes only for visual presets 2 and 3. The play button sits at the art frame's top-right corner (`data-play-anchor="235 54 24 top-right"`).
 
 ## Rebuild
 
-The page is built from three other repos, all at `main`:
+The page is built from three other repos, from clean worktrees at `main` (the footer alternatives come from two more onchain-midi-player checkouts), plus the rendition sets in `renditions/`:
 
 | Variable | Repo | What the build takes from it |
 | --- | --- | --- |
-| `OMP` | [onchain-midi-player](https://github.com/Provable-Games/onchain-midi-player) | Player and engine segments, the reference Beast page (`examples/beast_consumer`), page assembly and `validate_token_uri` |
-| `BEAST` | [midi_fun_contract](https://github.com/caseywescott/midi_fun_contract) | Casey's beast-sound engine: each Beast's MIDI and the TinyChip settings |
-| `BEASTS3` | [beasts-v3](https://github.com/Provable-Games/beasts-v3) (private) | The Beast card template and the 75 genesis GIFs |
+| `OMP` | [onchain-midi-player](https://github.com/Provable-Games/onchain-midi-player) | The engine tests: player and engine segments, the reference Beast page (`examples/beast_consumer`), page assembly and `validate_token_uri` |
+| `BEAST` | [midi_fun_contract](https://github.com/caseywescott/midi_fun_contract) | Casey's beast-sound engine: the TinyChip settings and bank, and the species names, for the engine tests |
+| `BEASTS3` | [beasts-v3](https://github.com/Provable-Games/beasts-v3) (private) | The engine tests' card template and the 75 genesis GIFs; the deployed page footer (`assets/player-page/footer.html`, checked against its manifest and against onchain-midi-player's file at the manifest's source revision) |
+| `OMP_MAIN` | onchain-midi-player at `origin/main` | The "Upstream main" page footer (`examples/beast_consumer/fixtures/footer.html`) and its commit |
+| `OMP_PR88` | onchain-midi-player at `origin/feat/pause-freezes-img-art` ([#88](https://github.com/Provable-Games/onchain-midi-player/pull/88)) | The "Pause-freeze PR" page footer and its commit |
+
+`build_site.mjs` bakes in each footer's text, commit and SHA-256 and a summary of each set in `renditions/`; it does not embed the sets. `OMP` may be a different commit from `OMP_MAIN`: the engine tests follow `OMP`, the footer selector follows `OMP_MAIN` and `OMP_PR88`. Rebuild when either footer branch moves or a set is added. When #88 merges, point `OMP_PR88` at its merge commit (or drop the option once the deployed footer has it).
 
 The engine is [pocket-synth](https://github.com/Provable-Games/pocket-synth). onchain-midi-player pins an exact signed release of it, so the sound check follows pocket-synth only through onchain-midi-player.
 
@@ -51,6 +67,10 @@ The engine is [pocket-synth](https://github.com/Provable-Games/pocket-synth). on
 
    git -C /workspace/beasts-v3 fetch -q origin
    git -C /workspace/beasts-v3 worktree add --detach /workspace/beasts-v3-worktrees/sound-check origin/main
+
+   # the page footers (no install needed)
+   git -C /workspace/onchain-midi-player worktree add --detach /workspace/onchain-midi-player-worktrees/sound-check-footer-main origin/main
+   git -C /workspace/onchain-midi-player worktree add --detach /workspace/onchain-midi-player-worktrees/sound-check-footer-pr88 origin/feat/pause-freezes-img-art
    ```
 
 3. **Build** from this repo, on an up-to-date `main`:
@@ -61,35 +81,41 @@ The engine is [pocket-synth](https://github.com/Provable-Games/pocket-synth). on
    export OMP=/workspace/onchain-midi-player-worktrees/sound-check
    export BEAST=/workspace/midi_fun_contract-worktrees/sound-check
    export BEASTS3=/workspace/beasts-v3-worktrees/sound-check
+   export OMP_MAIN=/workspace/onchain-midi-player-worktrees/sound-check-footer-main
+   export OMP_PR88=/workspace/onchain-midi-player-worktrees/sound-check-footer-pr88
    PLAYER=$(sed -n 's/^export const VERSION = "\([^"]*\)".*/\1/p' $OMP/scripts/segments.mjs)
    ENGINE=$(sed -n 's/^export const ENGINE_PIN = { ref: "\([^"]*\)".*/\1/p' $OMP/scripts/engine.mjs)
    export OMP_LABEL="origin/main $(git -C $OMP rev-parse --short HEAD) (player $PLAYER, pocket-synth $ENGINE)"
    export BEAST_LABEL="origin/main $(git -C $BEAST rev-parse --short HEAD)"
-   node tools/gen_tracks.mjs        # writes tools/tracks.json: expect 77 tracks and "warn []"
-   node tools/build_site.mjs        # writes index.html
+   node tools/gen_tracks.mjs        # writes tools/tracks.json: expect 61 tracks and "warn []"
+   node tools/build_site.mjs        # writes index.html (the engine tests, the footers and a summary of renditions/)
    ```
 
    `bankFail` lists client-bank presets the beast-sound engine can't map yet (three AM-modulator presets as of 2026-10). They are reported, not errors.
 
    If the player `VERSION` changed and you want to A/B against the outgoing page, run `mkdir -p old && cp index.html old/index.html` before building, which serves the outgoing page at `/old/`. Saved results are stored per player version, so a new version starts with a clean sheet.
 
-   `/old/` is built with the same tools from an older player, so a change to this site's tools (the engine test, say) needs both pages rebuilt. Make a second onchain-midi-player worktree at the old commit (`8b1ff66`, player 0.7.0, pocket-synth v2.0.1), run `gen_tracks.mjs` with that as `OMP` and `OMP_LABEL="origin/main before #85 8b1ff66 (player 0.7.0, pocket-synth v2.0.1)"`, build it with `OUT=$PWD/old/index.html node tools/build_site.mjs`, then build the main page as above. Rebuilding either from unchanged sources changes only the `generated` time in its data.
+   `/old/` is built with the same tools from an older player, so a change to this site's tools (the engine test, say) needs both pages rebuilt. It was last built before section 1 became the real Beasts, and nothing in it depends on them; rebuilding it with today's tools gives it the same section 1 (which plays the deployed pages, whatever `OMP` is) and needs `OMP_MAIN` and `OMP_PR88` too. Make a second onchain-midi-player worktree at the old commit (`8b1ff66`, player 0.7.0, pocket-synth v2.0.1), run `gen_tracks.mjs` with that as `OMP` and `OMP_LABEL="origin/main before #85 8b1ff66 (player 0.7.0, pocket-synth v2.0.1)"`, build it with `OUT=$PWD/old/index.html node tools/build_site.mjs`, then build the main page as above. Rebuilding either from unchanged sources changes only the `generated` time in its data.
 
 4. **Smoke-test** in Chromium and WebKit at phone size. Expect every check to pass in both:
 
    ```sh
-   PLAYWRIGHT_CORE=<node_modules/playwright-core> PLAYWRIGHT_BROWSER=chromium node tools/smoke.mjs
-   PLAYWRIGHT_CORE=<node_modules/playwright-core> PLAYWRIGHT_BROWSER=webkit node tools/smoke.mjs
+   BEASTS3=$BEASTS3 PLAYWRIGHT_CORE=<node_modules/playwright-core> PLAYWRIGHT_BROWSER=chromium node tools/smoke.mjs
+   BEASTS3=$BEASTS3 PLAYWRIGHT_CORE=<node_modules/playwright-core> PLAYWRIGHT_BROWSER=webkit node tools/smoke.mjs
    ```
 
-   The browsers need their system libraries; `npx playwright install-deps` installs them where you have root. The test covers:
+   It serves the site on 127.0.0.1 itself (a `file://` page cannot fetch the set, and `crypto.subtle` needs a secure context). `BEASTS3` is optional: with it, each real Beast's GIF is also checked against its canonical genesis file. `SHOTS=<dir>` saves phone-width screenshots of the picker and the footer banner, light and dark; `PLAYWRIGHT_EXECUTABLE` overrides the browser's launcher. The browsers need their system libraries; `npx playwright install-deps` installs them where you have root. The test covers:
 
-   - every section's tracks, with background audio and media metadata
+   - real Beasts: each variant (Genesis, presets 0 to 3) loads byte-identical to the `animation_url` Node rebuilds from the set, plays, has the notes fragment only on Genesis and presets 2 and 3, and shows its Shiny or Regular GIF; the facts; a SHA-256 mismatch refuses to play; a page without `crypto.subtle` says why
+   - the page footer: as deployed is the rebuilt page and its GIF keeps moving while paused; the PR #88 footer is spliced in, shows the banner, freezes the art on pause (no change over 2 s) and animates after resume; upstream main plays; the choice and a rating persist across a reload; the export records set, block, token ID, name, preset and footer with its commit
+
+   - every engine-test section's tracks, with background audio and media metadata
    - play-button placement, size settings and touch target
    - sprite stepping and art drift against the music
    - the animation speed: the sprite `dur` at every step, with and without card sync, at and above 150 BPM; the card-sync animations unchanged; the shipped step by default; off for the GIF and static Beasts
    - pause and resume
    - the design lab
+   - no horizontal scroll at 390 px, no console errors, no requests beyond the page and its set
 
 5. **Publish and verify:**
 
@@ -103,7 +129,7 @@ The engine is [pocket-synth](https://github.com/Provable-Games/pocket-synth). on
 
 ## Sepolia rendition sets
 
-`renditions/<deployment>/` holds real Beasts read from a Beasts V3 Sepolia deployment: the raw `token_uri` of one Beast for each of the 75 original species at visual effects 0, 1, 2 and 3 (sound effects equal to visual effects), plus the 75 Genesis Beasts (visual 3, sound 1). Each set is versioned by its deployment (for example `renditions/sepolia-2026-10-29/`) and is never overwritten. The page does not use it yet; the Sound Check will be rebuilt on top of it.
+`renditions/<deployment>/` holds real Beasts read from a Beasts V3 Sepolia deployment: the raw `token_uri` of one Beast for each of the 75 original species at visual effects 0, 1, 2 and 3 (sound effects equal to visual effects), plus the 75 Genesis Beasts (visual 3, sound 1). Each set is versioned by its deployment (for example `renditions/sepolia-2026-10-29/`) and is never overwritten. Section 1 of the page plays them: `build_site.mjs` lists the sets it finds here (newest block first), and the page fetches the chosen one when it opens.
 
 - `manifest.json` (`schemaVersion: 1`): the deployment; the beasts-v3 record (its path and SHA-256, the deployment's release commit, and the branch head the mint script ran from); the beasts-v3 checkout the set was read with (`beasts3BranchHead`, a branch head, not necessarily on `main`); the chain id and the block every read used; the NFT, registry, renderer, art provider and Sound Manager addresses; the TinySynth class and version; the renderer's rainbow and notes masks; and per token: token ID, species, name, identity (prefix and suffix), visual and sound effects, shiny, art (Shiny or Regular GIF), notes, rainbow, the MIDI's tempo, and the length and SHA-256 of the raw `token_uri`.
 - The raw `token_uri` exactly as the NFT returned it is the ground truth, stored deduplicated. Most of it is the same across tokens (the player, gunzip, notes and bootstrap scripts, the card's style with its embedded font, each species' GIF, many MIDI files), so `fragments.json.gz` holds each shared piece once and `tokens/<token ID>.json.gz` holds one skeleton per token: the `token_uri` taken apart at its three base64 data URIs (metadata, card SVG, player page), with references to the shared pieces. [`tools/rendition_set.mjs`](tools/rendition_set.mjs) rebuilds the exact string and checks its length and SHA-256 against the manifest, failing on any difference; it runs unchanged in the browser (`DecompressionStream`, `crypto.subtle`, which needs the https site or localhost) and in Node:
@@ -153,4 +179,6 @@ Run these in order after every new Beasts V3 Sepolia deployment. Use worktrees, 
 
    The first rebuilds every `token_uri` from the stored files, checks its length and SHA-256 against the manifest and re-runs the conformance checks offline. The second, for one token per preset, rebuilds it again with the same loader inside Chromium, then opens its page: the notes fragment only on presets 2 and 3, the Shiny GIF on 1 and 3, the tempo, and a page that loads with no errors and no network requests.
 
-4. **Commit** the new set (and remove the oldest if more than two remain).
+4. **Rebuild `index.html`** ([Rebuild](#rebuild), step 3): the page only offers the sets it was built with, and picks the newest by block. Run the smoke test.
+
+5. **Commit** the new set and the page (and remove the oldest set if more than two remain).
