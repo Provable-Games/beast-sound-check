@@ -2,6 +2,7 @@
 // Smoke test of index.html at a phone viewport (390x844) in Playwright Chromium and WebKit.
 //   PLAYWRIGHT_CORE=<node_modules/playwright-core> PLAYWRIGHT_BROWSER=chromium|webkit node smoke.mjs [tracks per section]
 import { createRequire } from "node:module";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -225,6 +226,86 @@ await page.uncheck("#cardSync");
   ok("lab proportion re-anchors the art: the button follows S times the card's scale", Math.abs(prop.d - Math.round(36 * 0.937)) <= 1 && new RegExp("The button is " + prop.d + " px").test(propSaid), `${prop.d} px | ${propSaid.slice(0, 120)}`);
   await page.click("#lreset"); await btn();
   ok("reset returns to the shipped page", !back.lab && back.d === ship.d && (await page.evaluate(() => document.getElementById("labbadge").hidden)), `${back.d} px`);
+}
+
+// ---- animation speed: the Synced sprite's dur per note value, nothing else in the art changes, shipped by default
+{
+  const D = JSON.parse(/<script type="application\/json" id="data">([\s\S]*?)<\/script>/.exec(fs.readFileSync(path.join(here, SITE), "utf8"))[1]);
+  const Q = { ultraslow: 4, slow: 2, medium: 1, fast: 0.5, ultrafast: 0.25 }; // quarter notes per frame
+  const sec = (us) => (us / 1e6).toFixed(6).replace(/0+$/, "").replace(/\.$/, ""); // art.mjs
+  const shipped = (a) => (a.tempoUs / 2 < 200000 ? "medium" : "fast"); // art.mjs frameUs: the eighth, or the quarter when the eighth is under 0.2 s
+  const want = (a, k) => sec(Math.round(a.tempoUs * Q[k]) * a.frames);
+  const SPRITE = /<animate attributeName='x' values='[^']*' dur='([0-9.]+)s' calcMode='discrete' repeatCount='indefinite'\/>/;
+  const svgOf = (html) => { const m = /id="beast-art"[^>]*src="data:image\/svg\+xml;base64,([^"]+)"/.exec(html); return m ? Buffer.from(m[1], "base64").toString("latin1") : null; };
+  const others = (svg) => (svg.match(/<animate(Transform)? [^>]*>/g) || []).filter((x) => !SPRITE.test(x));
+  const byLabel = (l) => D.tracks.find((t) => t.sectionId + "." + t.id.slice(1) === l);
+  // every animated track: the built Synced pages (with and without card sync) carry the shipped step's dur, and the policy
+  // agrees with the frame length gen_tracks recorded
+  const bad = [];
+  for (const t of D.tracks) {
+    if (!t.art.animated) continue;
+    for (const v of [1, 2]) { const d = (SPRITE.exec(svgOf(t.pages[v].art)) || [])[1]; if (d !== want(t.art, shipped(t.art))) bad.push(`${t.id}/${v}: ${d} vs ${want(t.art, shipped(t.art))}`); }
+    if (+(Math.round(t.art.tempoUs * Q[shipped(t.art)]) / 1000).toFixed(1) !== t.art.frameMs) bad.push(`${t.id}: frameMs ${t.art.frameMs}`);
+  }
+  ok("shipped step reproduces every built Synced dur", bad.length === 0, bad.length ? bad.slice(0, 3).join("; ") : `${D.tracks.filter((t) => t.art.animated).length} animated tracks x 2 variants`);
+  const open = (l) => page.evaluate((l) => { const b = Array.from(document.querySelectorAll(".trk")).find((x) => x.querySelector(".id").textContent === l); b.closest("details").open = true; b.click(); }, l);
+  const srcdoc = () => page.evaluate(() => document.querySelector("#pw iframe").srcdoc);
+  const pressed = () => page.evaluate(() => Array.from(document.querySelectorAll("[data-speed]")).filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.getAttribute("data-speed")).join(","));
+  const disabled = () => page.evaluate(() => Array.from(document.querySelectorAll("[data-speed]")).map((b) => b.disabled));
+  const liveDur = async () => { const f = await (await page.locator("iframe").elementHandle()).contentFrame(); await f.waitForSelector("#play:not([disabled])"); return f.evaluate(() => (document.querySelector("#beast-art animate[attributeName=x]") || { getAttribute: () => null }).getAttribute("dur")); };
+  // two tracks at or below 150 BPM (2.03 at 120, 2.06 at exactly 150) and two above (2.07 and 3.01 at 175)
+  for (const l of ["2.03", "2.06", "2.07", "3.01"]) {
+    const t = byLabel(l), a = t.art, ship = shipped(a);
+    await open(l); await page.waitForTimeout(200);
+    const dflt = await pressed(), s0 = await srcdoc(), info = await page.textContent("#artinfo");
+    ok(`speed ${l} (${a.bpm} BPM, ${a.frames} frames): default is the shipped step, page as built`, dflt === ship && s0.includes(t.pages[1].art) && (a.bpm > 150 ? ship === "medium" : ship === "fast") && info.includes("shipped: " + (ship === "fast" ? "eighth" : "quarter") + " note") && info.includes("GIF: " + a.gifMs[0]), `pressed ${dflt}, info: ${info.slice(info.indexOf("Synced:"), info.indexOf(" The song"))}`);
+    for (const card of [false, true]) {
+      if (card) await page.check("#cardSync"); else await page.uncheck("#cardSync");
+      const v = card ? 2 : 1, built = svgOf(t.pages[v].art), builtDur = SPRITE.exec(built)[1];
+      const res = [];
+      for (const k of Object.keys(Q)) {
+        await page.click(`[data-speed=${k}]`);
+        const html = await srcdoc(), svg = svgOf(html), d = (SPRITE.exec(svg) || [])[1], live = await liveDur();
+        const same = svg.replace(SPRITE, (m, x) => m.replace(`dur='${x}s'`, `dur='${builtDur}s'`)) === built; // everything but the sprite dur is the built art
+        const ratio = Math.abs(d / builtDur - Q[k] / Q[ship]) < 2e-5;
+        const keepCard = JSON.stringify(others(svg)) === JSON.stringify(others(built));
+        const asBuilt = k !== ship || html.includes(t.pages[v].art);
+        res.push({ k, d, live, pass: d === want(a, k) && live === d + "s" && same && ratio && keepCard && asBuilt && (await pressed()) === k });
+      }
+      ok(`speed ${l}${card ? " with card sync" : ""}: sprite dur per step, card animates unchanged`, res.every((r) => r.pass), res.map((r) => `${r.k} ${r.d}s${r.pass ? "" : " FAIL(live " + r.live + ")"}`).join(", ") + ` | card: ${others(built).map((x) => (/dur='([^']*)'/.exec(x) || [])[1]).join(" ")}`);
+    }
+    await page.uncheck("#cardSync");
+    await page.click("#speedship");
+  }
+  // off in GIF mode (even with a step chosen) and on a static Beast
+  await open("2.03"); await page.waitForTimeout(200);
+  await page.click("[data-speed=slow]");
+  await page.click("#aGif"); await page.waitForTimeout(200);
+  const g = { dis: await disabled(), why: await page.textContent("#speedwhy"), as: (await srcdoc()).includes(byLabel("2.03").pages[0].art) };
+  ok("speed is off for the original GIF", g.dis.every(Boolean) && /original GIF/.test(g.why) && g.as, `${JSON.stringify(g.dis)} | ${g.why}`);
+  await page.click("#aSync");
+  await open("2.04"); await page.waitForTimeout(200);
+  const st = { dis: await disabled(), why: await page.textContent("#speedwhy"), as: (await srcdoc()).includes(byLabel("2.04").pages[1].art), pr: await pressed(), anim: byLabel("2.04").art.animated };
+  ok("speed is off on a static PNG Beast", !st.anim && st.dis.every(Boolean) && /static PNG/.test(st.why) && st.as && st.pr === "", `${JSON.stringify(st.dis)} | ${st.why}`);
+  // the export records the speed each result was rated with, and the setting survives a reload
+  await open("2.07"); await page.waitForTimeout(200);
+  if ((await page.getAttribute("#bp", "aria-pressed")) === "true") await page.click("#bp");
+  await page.click("#bp");
+  await page.evaluate(() => { try { if (navigator.clipboard) navigator.clipboard.writeText = (t) => { window.__clip = t; return Promise.resolve(); }; } catch (e) {} window.__clip = ""; });
+  await page.click("#export"); await page.waitForTimeout(200);
+  const ex = await page.evaluate(() => window.__clip || document.getElementById("exporttext").value);
+  const line = ex.split("\n").find((x) => x.startsWith("PASS 2.07")) || "";
+  ok("export records the speed a result was rated with", /\[Synced Slow, one frame per half note, 685\.7 ms \(shipped: quarter note\)\]/.test(line) && /Animation speed now: Slow/.test(ex), line);
+  await page.click("#bp");
+  await page.reload(); await page.waitForTimeout(300);
+  ok("speed setting persists", (await pressed()) === "slow", await pressed());
+  await page.goto("file://" + path.join(here, SITE) + "?speed=ultrafast#203"); await page.waitForTimeout(300);
+  const u = (SPRITE.exec(svgOf(await srcdoc())) || [])[1];
+  ok("?speed= selects a step", (await pressed()) === "ultrafast" && u === want(byLabel("2.03").art, "ultrafast"), `${await pressed()} ${u}s`);
+  await page.click("#speedship");
+  ok("back to the shipped speed", (await pressed()) === "fast" && (await srcdoc()).includes(byLabel("2.03").pages[1].art) && (await page.isHidden("#speedship")), await pressed());
+  const sw2 = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+  ok("no horizontal scroll with the speed row", sw2[0] <= sw2[1], `scrollWidth ${sw2[0]} / ${sw2[1]}`);
 }
 
 ok("no console errors", errors.length === 0, errors.slice(0, 3).join(" | "));

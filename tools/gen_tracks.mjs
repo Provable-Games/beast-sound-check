@@ -185,13 +185,15 @@ function build({ id, section, title, blurb, checks, settings, midi, pick, string
   const sub = tempoUs / 2 < 200000 ? "quarter note (the eighth would be under 0.2 s)" : "eighth note";
   const notesCheck = "Notes: the song's own MIDI scrolls right to left behind the Beast in the art frame, one colour per channel, drums as ticks along the bottom; each note sounds as it reaches the playhead near the left edge. They stand still before play, freeze on pause, and loop with the music.";
   const artChecks = !art.animated ? [notesCheck, `Static Beast: ${strings.name}, ${beast.shiny ? "shiny" : "regular"} (the genesis PNG, no animation). The art buttons all show the same picture.`] : [notesCheck,
-    `Art frames flip on the eighth notes (quarter notes above 150 BPM). Synced art, the default: ${strings.name}, ${beast.shiny ? "shiny" : "regular"}, ${art.n} frames, one per ${sub} at ${bpm.toFixed(2)} BPM (${(fl / 1000).toFixed(1)} ms); ${art.n === 5 ? "5 frames cycle every 5 steps and realign only at the loop; " : art.n === 3 || art.n === 6 ? "the " + art.n + "-frame cycle does not divide a bar, so a downbeat falls on different frames within a pass; " : ""}no drift to the end of the pass.`,
+    `At the shipped animation speed, art frames flip on the eighth notes (quarter notes above 150 BPM); the Animation speed row tries others. Synced art, the default: ${strings.name}, ${beast.shiny ? "shiny" : "regular"}, ${art.n} frames, one per ${sub} at ${bpm.toFixed(2)} BPM (${(fl / 1000).toFixed(1)} ms); ${art.n === 5 ? "5 frames cycle every 5 steps and realign only at the loop; " : art.n === 3 || art.n === 6 ? "the " + art.n + "-frame cycle does not divide a bar, so a downbeat falls on different frames within a pass; " : ""}no drift to the end of the pass.`,
     `The art snaps cleanly at each loop and looks identical to the GIF apart from timing. Tap "Original GIF" above to compare (its frames run at the GIF's own 0.2 s and slide against the music).${art.delays.some((x) => x !== art.delays[0]) ? " This species' GIF has uneven frame delays (" + art.delays.map((x) => x * 10).join("/") + " ms); the sprite uses regular frames." : ""}`,
   ];
   tracks.push({
     id, sectionId: section[0], section: section.slice(2), title, blurb, checks: [...checks, ...artChecks],
     midiBytes: midi.length, settingsBytes: settings_len,
-    art: { id: beast.id, name: strings.name, shiny: !!beast.shiny, animated: !!art.animated, frames: art.n, gifBytes: art.gif ? art.gif.length : 0, spriteBytes: art.png.length, bpm: +bpm.toFixed(2), frameMs: +(fl / 1000).toFixed(1) },
+    art: { id: beast.id, name: strings.name, shiny: !!beast.shiny, animated: !!art.animated, frames: art.n, gifBytes: art.gif ? art.gif.length : 0, spriteBytes: art.png.length, bpm: +bpm.toFixed(2), frameMs: +(fl / 1000).toFixed(1),
+      // the exact tempo the sprite was timed with (the page retimes it for the Animation speed control) and the GIF's own frame delays
+      tempoUs, gifMs: art.animated ? art.delays.map((x) => x * 10) : [] },
     d, pages,
   });
   return id;
