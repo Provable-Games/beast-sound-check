@@ -15,8 +15,8 @@
 // sound manager (registry reads), the renderer's TinySynth class and version, and the record's token IDs.
 // Each token_uri must pass beasts-v3's assertTokenMetadataConformance (the checks of `metadata:check --token-uri`)
 // with its expected token ID, species, the renderer's rainbow mask and the exact canonical GIF; its notes fragment
-// must match the renderer's notes mask. Over SIZE_LIMIT the files are stored gzipped (the site opens them with
-// DecompressionStream("gzip")).
+// must match the renderer's notes mask. The set is stored deduplicated and gzipped (tools/rendition_set.mjs reads
+// it and rebuilds each exact token_uri, checking its SHA-256, in Node or a browser).
 import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -24,12 +24,12 @@ import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import zlib from "node:zlib";
+import { IMAGE, NUL, PAGE, openRenditionSet, rebuildTokenUri } from "./rendition_set.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.dirname(here);
 export const SCHEMA = "beast-sound-check-renditions/v1";
 export const SCHEMA_VERSION = 1;
-export const SIZE_LIMIT = 25 * 1024 * 1024;
 const RECORD_SCHEMA = "beasts-rendition-set/v1";
 /** The future shape of a token's `tracks` entry; schema 1 always writes `tracks: []`. */
 export const TRACK_ENTRY_SHAPE = {
@@ -286,24 +286,38 @@ async function fetchWith({ o, beasts3, deploy, sdk, hash, rec, recordRel, base, 
   });
 
   const rawBytes = entries.reduce((s, e) => s + e.bytes.length, 0);
-  const gzip = rawBytes > SIZE_LIMIT;
+  // Store the set deduplicated: shared fragments once, one skeleton per token (see rendition_set.mjs). Every
+  // skeleton must rebuild its token_uri byte for byte before anything is written.
+  const { fragments, skeletons } = deduplicate(entries.map((e) => e.bytes.toString("utf8")));
+  // --replace rebuilds this set from scratch, once every read and check above has passed.
+  if (o.replace) fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(path.join(outDir, "tokens"), { recursive: true });
-  let storedBytes = 0;
-  for (const e of entries) {
-    const file = `tokens/${e.row.tokenId}.txt${gzip ? ".gz" : ""}`;
-    const data = gzip ? zlib.gzipSync(e.bytes, { level: 9, mtime: 0 }) : e.bytes;
+  const gz = (text) => zlib.gzipSync(Buffer.from(text, "utf8"), { level: 9, mtime: 0 });
+  const fragmentsData = gz(JSON.stringify(fragments));
+  fs.writeFileSync(path.join(outDir, "fragments.json.gz"), fragmentsData);
+  let storedBytes = fragmentsData.length;
+  entries.forEach((e, i) => {
+    const file = `tokens/${e.row.tokenId}.json.gz`;
+    const data = gz(JSON.stringify(skeletons[i]));
     fs.writeFileSync(path.join(outDir, file), data);
     e.row.file = file;
     e.row.storedBytes = data.length;
     storedBytes += data.length;
-  }
-  const beastsCommit = gitHead(beasts3);
+  });
+  const rawGzipBytes = entries.reduce((s, e) => s + zlib.gzipSync(e.bytes, { level: 9 }).length, 0);
   const manifest = {
     schema: SCHEMA,
     schemaVersion: SCHEMA_VERSION,
     deployment: setName,
-    record: { path: recordRel, sha256: sha256(fs.readFileSync(path.join(beasts3, recordRel))), baseRecord: rec.baseRecord, addenda: rec.addendaApplied, mintedWithCommit: rec.beastsCommit },
-    beastsCommit,
+    record: {
+      path: recordRel,
+      sha256: sha256(fs.readFileSync(path.join(beasts3, recordRel))),
+      baseRecord: rec.baseRecord,
+      addenda: rec.addendaApplied,
+      deploymentRelease: rec.deploymentRelease?.commit ?? null,
+      toolBranchHead: rec.toolBranchHead ? { branch: rec.toolBranchHead.branch, commit: rec.toolBranchHead.commit } : null,
+    },
+    beasts3BranchHead: { ...gitHead(beasts3), note: "the beasts-v3 checkout this set was read with (BEASTS3): a branch head, not necessarily a commit on main" },
     network: rec.network,
     chainId,
     blockNumber: block,
@@ -311,46 +325,118 @@ async function fetchWith({ o, beasts3, deploy, sdk, hash, rec, recordRel, base, 
     contracts: { ...rec.contracts, tinysynth: { classHash: toHex(tinysynthClass), version: tinysynthVersion } },
     renderer: { rainbowPresets: rainbow, notesPresets: notesMask },
     storage: {
-      encoding: "utf-8",
-      compression: gzip ? "gzip" : "none",
-      note: gzip ? "each file is the gzip of the raw token_uri string (open with DecompressionStream(\"gzip\")); sha256 is of the raw string" : "each file is the raw token_uri string; sha256 is of its bytes",
-      sizeLimit: SIZE_LIMIT,
+      layout: "deduplicated",
+      compression: "gzip",
+      fragments: "fragments.json.gz",
+      note: "rebuild a token's raw token_uri with tools/rendition_set.mjs (openRenditionSet or rebuildTokenUri); bytes and sha256 are of the raw token_uri string's UTF-8",
       rawBytes,
+      rawGzipBytes,
       storedBytes,
+      fragmentsBytes: fragmentsData.length,
+      fragmentCount: Object.keys(fragments).length,
       tokens: entries.length,
     },
     trackEntryShape: TRACK_ENTRY_SHAPE,
     tokens: entries.map((e) => e.row),
   };
   fs.writeFileSync(path.join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
-  log(`wrote ${path.relative(ROOT, outDir)}: ${entries.length} tokens, ${(rawBytes / 1048576).toFixed(2)} MiB raw, ${(storedBytes / 1048576).toFixed(2)} MiB stored (${manifest.storage.compression})`);
-  verifySet(outDir, { beasts3, sdk, quiet: false });
+  const mib = (n) => (n / 1048576).toFixed(2);
+  log(`wrote ${path.relative(ROOT, outDir)}: ${entries.length} tokens, ${mib(rawBytes)} MiB raw (${mib(rawGzipBytes)} MiB gzipped per token), ${mib(storedBytes)} MiB stored deduplicated (${manifest.storage.fragmentCount} shared fragments, ${mib(fragmentsData.length)} MiB)`);
+  await verifySet(outDir, { sdk, quiet: false });
   return manifest;
+}
+
+/** A base64 data URI's prefix (through the comma) and its decoded UTF-8 text. */
+function dataUri(uri, what) {
+  const comma = uri.indexOf(",");
+  if (comma < 0 || !uri.slice(0, comma).endsWith(";base64")) throw new Error(`${what} is not a base64 data URI`);
+  return [uri.slice(0, comma + 1), Buffer.from(uri.slice(comma + 1), "base64").toString("utf8")];
+}
+
+/** The strings worth sharing in one token: the page's scripts, script sources and style; the card's style, defs and embedded images. */
+function candidates(svg, html) {
+  const out = [];
+  for (const m of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)) {
+    const src = /src="([^"]*)"/.exec(m[1])?.[1];
+    if (src) out.push(src);
+    if (m[2]) out.push(m[2]);
+  }
+  for (const m of html.matchAll(/<style>[\s\S]*?<\/style>/g)) out.push(m[0]);
+  for (const m of svg.matchAll(/<style>[\s\S]*?<\/style>|<defs>[\s\S]*?<\/defs>|data:image\/[a-z+]+;base64,[A-Za-z0-9+/=]+/g)) out.push(m[0]);
+  return out;
+}
+
+/**
+ * Splits token_uris into shared fragments (a candidate of 200+ characters that two or more tokens hold) and one
+ * skeleton each. Throws unless every skeleton rebuilds its token_uri exactly.
+ */
+export function deduplicate(uris) {
+  const parts = uris.map((uri, i) => {
+    const [uriPrefix, json] = dataUri(uri, `token ${i}`);
+    const meta = JSON.parse(json);
+    const [imagePrefix, svg] = dataUri(meta.image, `token ${i} image`);
+    const [pagePrefix, html] = dataUri(meta.animation_url, `token ${i} animation_url`);
+    for (const t of [json, svg, html]) if (t.includes(NUL)) throw new Error(`token ${i} contains NUL, which the skeleton format reserves`);
+    return { uri, uriPrefix, json, image: meta.image, imagePrefix, svg, page: meta.animation_url, pagePrefix, html, candidates: [...new Set(candidates(svg, html))] };
+  });
+  const holders = new Map();
+  for (const p of parts) for (const c of p.candidates) holders.set(c, (holders.get(c) ?? 0) + 1);
+  const shared = [...holders].filter(([c, n]) => n >= 2 && c.length >= 200).map(([c]) => c).sort((a, b) => b.length - a.length);
+  const key = new Map(shared.map((c) => [c, sha256(Buffer.from(c, "utf8"))]));
+  const fragments = {};
+  const factor = (text, own) => {
+    for (const c of shared) {
+      if (!own.has(c) || !text.includes(c)) continue;
+      text = text.split(c).join(`${NUL}${key.get(c)}${NUL}`);
+      fragments[key.get(c)] = c;
+    }
+    return text;
+  };
+  const skeletons = parts.map((p, i) => {
+    const own = new Set(p.candidates);
+    const skeleton = {
+      uri: p.uriPrefix,
+      json: p.json.split(p.page).join(PAGE).split(p.image).join(IMAGE),
+      image: p.imagePrefix,
+      svg: factor(p.svg, own),
+      page: p.pagePrefix,
+      html: factor(p.html.split(p.image).join(IMAGE), own),
+    };
+    return { skeleton, i };
+  });
+  for (const { skeleton, i } of skeletons) {
+    if (rebuildTokenUri(skeleton, fragments) !== parts[i].uri) throw new Error(`token ${i}: its skeleton does not rebuild the token_uri byte for byte`);
+  }
+  return { fragments, skeletons: skeletons.map((x) => x.skeleton) };
 }
 
 const artUriSource = (genesisArt, speciesId, shiny) => [...genesisArt.values()].find((x) => x.speciesId === speciesId && x.provider === (shiny ? "shiny-gif" : "regular-gif")).source;
 
 function gitHead(dir) {
-  try {
-    return execFileSync("git", ["rev-parse", "HEAD"], { cwd: dir, encoding: "utf8" }).trim();
-  } catch {
-    return null;
-  }
+  const git = (args) => {
+    try {
+      return execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    } catch {
+      return null;
+    }
+  };
+  return { branch: git(["rev-parse", "--abbrev-ref", "HEAD"]), commit: git(["rev-parse", "HEAD"]) };
 }
 
-/** Re-reads a stored set: every file's raw bytes hash to its manifest entry and still pass the conformance checks. */
-export function verifySet(dir, { beasts3, sdk, quiet = true } = {}) {
-  const manifest = JSON.parse(fs.readFileSync(path.join(dir, "manifest.json"), "utf8"));
-  if (manifest.schema !== SCHEMA) throw new Error(`${dir} is not a ${SCHEMA} set`);
+/**
+ * Re-reads a stored set the way the site will: rebuilds every token_uri from its skeleton and the shared
+ * fragments, checks its length and SHA-256 against the manifest, and (with the SDK) re-runs the conformance checks.
+ */
+export async function verifySet(dir, { sdk, quiet = true } = {}) {
+  const set = await openRenditionSet((p) => fs.readFileSync(path.join(dir, p)));
+  if (set.manifest.schema !== SCHEMA) throw new Error(`${dir} is not a ${SCHEMA} set`);
   let n = 0;
-  for (const t of manifest.tokens) {
-    const stored = fs.readFileSync(path.join(dir, t.file));
-    const raw = manifest.storage.compression === "gzip" ? zlib.gunzipSync(stored) : stored;
-    if (raw.length !== t.bytes || sha256(raw) !== t.sha256) throw new Error(`${t.file}: bytes or sha256 differ from the manifest`);
-    if (sdk) sdk.assertTokenMetadataConformance(raw.toString("utf8"), { tokenId: BigInt(t.tokenId), rainbowPresets: manifest.renderer.rainbowPresets });
+  for (const t of set.manifest.tokens) {
+    const uri = await set.tokenUri(t.tokenId);
+    if (sdk) sdk.assertTokenMetadataConformance(uri, { tokenId: BigInt(t.tokenId), rainbowPresets: set.manifest.renderer.rainbowPresets });
     n++;
   }
-  if (!quiet) console.log(`verified ${n} stored token_uri files against the manifest${sdk ? " and the conformance checks" : ""}`);
+  if (!quiet) console.log(`verified ${n} rebuilt token_uris against the manifest's sizes and SHA-256${sdk ? " and the conformance checks" : ""}`);
   return n;
 }
 
@@ -359,7 +445,7 @@ async function main() {
   if (o.verify) {
     const beasts3 = o.beasts3 ?? process.env.BEASTS3;
     const sdk = beasts3 ? (await loadBeasts(path.resolve(beasts3))).sdk : null;
-    verifySet(path.resolve(o.verify), { sdk, quiet: false });
+    await verifySet(path.resolve(o.verify), { sdk, quiet: false });
     return;
   }
   await fetchSet(o);
