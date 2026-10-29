@@ -11,7 +11,7 @@
 //
 // Every page is the complete NFT-owned document of onchain-midi-player's reference Beast consumer
 // (examples/beast_consumer: scripts/composition.mjs consumerPieces with the example's ALIGN options):
-// head ++ gunzip ++ player ++ trusted body ++ art ++ D(settings, midi) ++ footer (bootstrap: controls,
+// head ++ gunzip ++ player ++ trusted body ++ art ++ D(settings, midi) ++ notes ++ footer (bootstrap: controls,
 // art sync, background audio, media session). Each page is round-tripped through the spliced token_uri
 // and decodeTokenUri, and the token_uri passes scripts/validate_token_uri.mjs, so the bytes are what a
 // 0.7.0 Beast's animation_url would carry.
@@ -194,11 +194,14 @@ function build({ id, section, title, blurb, checks, settings, midi, pick, string
   return id;
 }
 // The composed page is FIXED.head ++ ws ++ FIXED.gunzip ++ ws ++ FIXED.player ++ FIXED.body ++ art ++ D ++ ws
-// ++ FIXED.footer, where each ws is the alignment whitespace consumerPieces adds (it depends on the token's
-// JSON and art lengths). The fixed fragments are stored once; each track keeps its art, D and ws lengths.
+// ++ FIXED.notes ++ ws ++ FIXED.footer, where each ws is the alignment whitespace consumerPieces adds (it depends
+// on the token's JSON and art lengths). FIXED.notes (the notes drawn behind the art, onchain-midi-player #83) is
+// there when the example's ALIGN asks for it; otherwise it is empty, with no ws. The fixed fragments are stored
+// once; each track keeps its art, D and ws lengths.
 const FIXED = {
   head: CMP.ownedFragment("head"), gunzip: SEG.fixedFragment("gunzip"), player: SEG.fixedFragment("player"),
-  body: CMP.ownedFragment(ALIGN.trustedArt ? "trusted_body" : "body"), footer: CMP.ownedFragment("footer"),
+  body: CMP.ownedFragment(ALIGN.trustedArt ? "trusted_body" : "body"), notes: ALIGN.notes ? CMP.ownedFragment("notes") : "",
+  footer: CMP.ownedFragment("footer"),
 };
 let playAnchor = ""; // the art's data-play-anchor, the same on every card (art.mjs)
 const jsonText = (x) => x.replace(/[\\"]/g, "\\$&").replace(/[\u0000-\u001f]/g, " ");
@@ -207,10 +210,10 @@ function splitPage(html, art, d, title) {
   let at = 0;
   const take = (frag, gap) => {
     if (gap) { let n = 0; while (html[at + n] === " ") n++; if (n % 9) throw new Error(`${title}: odd alignment gap ${n}`); ws.push(n / 9); at += n; }
-    if (!html.startsWith(frag, at)) throw new Error(`${title}: page layout differs from head ++ gunzip ++ player ++ body ++ art ++ D ++ footer at byte ${at}`);
+    if (!html.startsWith(frag, at)) throw new Error(`${title}: page layout differs from head ++ gunzip ++ player ++ body ++ art ++ D ++ notes ++ footer at byte ${at}`);
     at += frag.length;
   };
-  take(FIXED.head); take(FIXED.gunzip, true); take(FIXED.player, true); take(FIXED.body); take(art); take(d); take(FIXED.footer, true);
+  take(FIXED.head); take(FIXED.gunzip, true); take(FIXED.player, true); take(FIXED.body); take(art); take(d); if (FIXED.notes) take(FIXED.notes, true); take(FIXED.footer, true);
   if (at !== html.length) throw new Error(`${title}: trailing bytes`);
   return { art, ws };
 }

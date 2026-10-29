@@ -175,7 +175,7 @@ var D = JSON.parse(document.getElementById("data").textContent);
 var T = D.tracks, F = D.fixed, KEY = "beast-sound-check-${V}-v1";
 // the page as consumerPieces composed it: fixed fragments, this track's art and D, and its alignment whitespace
 function pageOf(t, v) { var p = t.pages[v], sp = function (n) { return new Array(9 * n + 1).join(" "); };
-  return F.head + labStyle() + sp(p.ws[0]) + F.gunzip + sp(p.ws[1]) + F.player + F.body + labArt(p.art) + t.d + sp(p.ws[2]) + F.footer; }
+  return F.head + labStyle() + sp(p.ws[0]) + F.gunzip + sp(p.ws[1]) + F.player + F.body + labArt(p.art) + t.d + sp(p.ws[2]) + (F.notes ? F.notes + sp(p.ws[3]) : "") + F.footer; }
 function variant() { return store.art === "gif" ? 0 : store.card ? 2 : 1; }
 var store = { r: {}, g: {}, last: "", art: "synced", card: false, lab: null, v: 1 };
 // The page's own button settings, as shipped (the head stylesheet's :root custom properties)
