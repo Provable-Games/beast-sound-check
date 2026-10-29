@@ -831,6 +831,52 @@ for (const quality of [1, 0]) {
   });
 }
 
+// Stress: timed load ramps, so the time a phone starts to crackle or stutter tells which load and how
+// much. No voice is ever stolen (at most 56 melodic voices plus drum hits, under the 64 limit), so any
+// click is the device, not the voice limit. The pad is the heaviest legal timbre: 8 operators, 4 audio
+// outputs through low-pass filters, each frequency-modulated by its own operator (20 nodes per voice).
+{
+  const song = new Song(120), T = (s) => Math.round(s * SEC120);
+  const pad = { drum: false, slot: 0, operators: [
+    ...[0, 1, 2, 3].map((k) => Op({ route: 0, wave: ["Sawtooth", "Square", "Triangle", "Sawtooth"][k], volume: 220, ratio: [10000, 20000, 5000, 30000][k], offset_hz: k * 15000, attack: 2000, hold: 0, decay: 5000, sustain: 7000, release: 2000, filter: SF.filter("LowPass", 30000 + k * 10000, 9000, true) })),
+    ...[1, 2, 3, 4].map((target, k) => Op({ route: target, wave: "Sine", volume: 600 + k * 200, ratio: [10000, 15000, 20000, 7000][k], attack: 1000, hold: 0, decay: 8000, sustain: 5000, release: 2000 })),
+  ] };
+  // The arpeggio lead: 2 operators with a short release, so the fast notes' tails stay short and the
+  // voice count stays under the limit.
+  const lead = { drum: false, slot: 1, operators: [
+    Op({ route: 0, wave: "Square", volume: 1500, attack: 20, hold: 0, decay: 400, sustain: 6000, release: 250 }),
+    Op({ route: 1, wave: "Sine", volume: 900, ratio: 20000, attack: 0, hold: 0, decay: 600, sustain: 3000, release: 250 }),
+  ] };
+  const PADS = [0, 1, 2, 3, 4, 5, 6, 7], ARPS = [8, 10, 11, 12, 13, 14, 15];
+  PADS.forEach((c, i) => song.setup(c, 0, { vol: 40, pan: 16 + i * 13 }));
+  ARPS.forEach((c, i) => song.setup(c, 1, { vol: 50, pan: 100 - i * 12 }));
+  song.setup(9, 0);
+  const CHORD = [0, 4, 7, 11, 14]; // C major 9, spread over five octaves
+  const padPitch = (i) => 36 + CHORD[i % 5] + 12 * (Math.floor(i / 5) % 5);
+  // Phase 1, 0:02-0:20: 4 more pad voices every second, 4 at 0:02 up to 56 at 0:15, held to 0:20.
+  for (let i = 0; i < 56; i++) { const at = T(2 + Math.floor(i / 4)); song.on(PADS[i % 8], at, padPitch(i), 100, T(20) - at); }
+  // Phases 2 and 3: 32nd-note arpeggios (16 notes per second per channel) on the lead; in
+  // phase 2 (0:21-0:37) one more channel starts every 2 s, 16 notes/s at 0:21 up to 112 at 0:33.
+  const ARP = [0, 4, 7, 12, 16, 12, 7, 4];
+  ARPS.forEach((c, k) => { for (let t = T(21 + 2 * k); t < T(45); t += 60) song.on(c, t, 60 + k * 2 + ARP[(t / 60) % 8], 90, 40); });
+  // Phase 3, 0:37-0:45: 40 pad voices start together (800 nodes in one scheduler tick) over all 7 arpeggios.
+  for (let i = 0; i < 40; i++) song.on(PADS[i % 8], T(37), padPitch(i + 3), 100, T(45) - T(37));
+  // A hi-hat on every beat (a kick on each bar) to 0:45, the timing reference: a stutter shows as an uneven hat.
+  for (let t = 0; t < T(45); t += 480) song.hit(t, t % 1920 ? 42 : 36, t % 1920 ? 70 : 100);
+  const END = T(48);
+  edge("Stress test: load ramps", {
+    sub: "56 voices, 112 notes/s", blurb: "Timed ramps of audio load and note rate over a steady hi-hat: the time it first crackles or stutters tells which load and how much. Compare with /old/ on the same phone.",
+    checks: [
+      "0:00-0:02 baseline, hi-hat only: if this crackles, the problem is not load.",
+      "0:02-0:20 voice ramp: a heavy filtered FM pad gains 4 voices every second (4 at 0:02, 8 at 0:03, ... 56 from 0:15 to 0:20). Note the time of the first crackle: 4 x (seconds - 1) is the phone's voice ceiling.",
+      "0:21-0:37 note-rate ramp: fast arpeggios, 16 more notes per second every 2 s (16 at 0:21 up to 112 at 0:33). Note the time the hi-hat first goes uneven or the arpeggios stumble.",
+      "0:37-0:45 both at once: 40 pad voices start together over all the arpeggios. Note any crackle, dropout or stutter, and whether it recovers.",
+      "No voice is ever stolen here: a click or pop is the device falling behind, not the voice limit.",
+      "0:45-0:48 tail; loop at 0:48 should be clean. Note any UI freeze or lag while it plays.",
+    ], settings: { ...baseSettings, timbres: [pad, lead] }, midi: song.bytes(END),
+  });
+}
+
 // =============================================================================================
 // 5. Client chip bank: the 80 presets that are not onchain essentials (77 map to SETTINGS)
 // =============================================================================================
