@@ -163,6 +163,15 @@ details.card>summary{cursor:pointer;font-weight:600;min-height:44px;display:flex
 .artrow{margin:4px 0 8px}.artrow button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-text);font-weight:600}
 .cardsync{display:flex;gap:10px;align-items:flex-start;min-height:44px;padding:4px 0;font-size:14px}.cardsync input{width:24px;height:24px;flex:none}
 .cardsync select{flex:1;min-width:0;max-width:100%}
+.speed{margin:4px 0 8px}.speedhd{display:flex;align-items:center;min-height:36px;font-size:14px}
+.speedft{display:flex;flex-wrap:wrap;gap:0 10px;align-items:center;justify-content:space-between;min-height:44px;margin-top:4px}
+.speedft .hint{margin:0}.speedft .linkish{min-height:44px;font-size:14px}
+.speedrow{display:flex;gap:6px}
+.speedrow button{flex:1 1 0;min-width:0;padding:4px 2px;font-size:14px;line-height:1.15;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.speedrow small{font-size:12px;font-weight:400}
+.speedrow button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-text);font-weight:600}
+.speedrow button.ship{outline:2px dashed var(--muted);outline-offset:2px}
+.speedrow button:disabled{opacity:.45;cursor:default}
 .rate button[aria-pressed=true].p{background:var(--pass);border-color:var(--pass);color:#fff}
 .rate button[aria-pressed=true].f{background:var(--fail);border-color:var(--fail);color:#fff}
 textarea{width:100%;min-height:76px;margin-top:10px;padding:10px;border-radius:12px;border:1px solid var(--line);background:var(--bg);resize:vertical}
@@ -218,6 +227,17 @@ ${BANNER}
     <button id="aSync" aria-pressed="true">Art: Synced</button>
   </div>
   <label class="cardsync"><input type="checkbox" id="cardSync"><span>Card synced (rim 16 beats, pulse 4 beats, logo 8 beats; Synced art only)</span></label>
+  <div class="speed" role="group" aria-labelledby="speedlbl">
+    <div class="speedhd" id="speedlbl">Animation speed: one Synced frame per</div>
+    <div class="speedrow">
+      <button data-speed="ultraslow" aria-pressed="false">Ultra slow<small>whole</small></button>
+      <button data-speed="slow" aria-pressed="false">Slow<small>half</small></button>
+      <button data-speed="medium" aria-pressed="false">Medium<small>quarter</small></button>
+      <button data-speed="fast" aria-pressed="false">Fast<small>eighth</small></button>
+      <button data-speed="ultrafast" aria-pressed="false">Ultra fast<small>16th</small></button>
+    </div>
+    <div class="speedft"><p class="hint" id="speedwhy"></p><button id="speedship" class="linkish" hidden>Back to the shipped speed</button></div>
+  </div>
   <label class="cardsync"><span>Engine test:</span> <select id="etest">
     <option value="">Off (the page as shipped)</option>
     <option value="meter">As shipped, with the load meter</option>
@@ -284,7 +304,7 @@ var D = JSON.parse(document.getElementById("data").textContent);
 var T = D.tracks, F = D.fixed, KEY = "beast-sound-check-${V}-v1";
 // the page as consumerPieces composed it: fixed fragments, this track's art and D, and its alignment whitespace
 function pageOf(t, v) { var p = t.pages[v], sp = function (n) { return new Array(9 * n + 1).join(" "); };
-  return F.head + labStyle() + engineTest() + sp(p.ws[0]) + F.gunzip + sp(p.ws[1]) + F.player + F.body + labArt(p.art) + t.d + sp(p.ws[2]) + (F.notes ? F.notes + sp(p.ws[3]) : "") + F.footer; }
+  return F.head + labStyle() + engineTest() + sp(p.ws[0]) + F.gunzip + sp(p.ws[1]) + F.player + F.body + labArt(v ? speedArt(t, p.art) : p.art) + t.d + sp(p.ws[2]) + (F.notes ? F.notes + sp(p.ws[3]) : "") + F.footer; }
 function variant() { return store.art === "gif" ? 0 : store.card ? 2 : 1; }
 var ENGINE_TEST = ${JSON.stringify(ENGINE_TEST)};
 var TESTS = { meter: { hint: null, preroll: null }, big1: { hint: "playback", preroll: 1 }, big02: { hint: "playback", preroll: 0.2 },
@@ -293,7 +313,39 @@ var TESTS = { meter: { hint: null, preroll: null }, big1: { hint: "playback", pr
   def1k: { hint: "default", preroll: 1, k: true }, n05_1k: { hint: 0.05, preroll: 1, k: true } };
 function engineTest() { var m = TESTS[store.test]; if (!m) return "";
   return "<script>(" + ENGINE_TEST + ")(" + JSON.stringify({ key: store.test, hint: m.hint, preroll: m.preroll, k: !!m.k }) + ");</scr" + "ipt>"; }
-var store = { r: {}, g: {}, last: "", art: "synced", card: false, lab: null, test: "", v: 1 };
+// Animation speed: the Synced sprite's frame length as a note value (q quarter notes per frame). "" in store.speed
+// follows the shipped policy per track (art.mjs frameUs: the eighth note, or the quarter when the eighth would be
+// under 0.2 s, above 150 BPM); a step chosen here applies to every track. Frame lengths round to whole microseconds
+// as frameUs does, so the shipped step reproduces the shipped dur exactly.
+var SPEEDS = { ultraslow: { q: 4, label: "Ultra slow", note: "whole note" }, slow: { q: 2, label: "Slow", note: "half note" },
+  medium: { q: 1, label: "Medium", note: "quarter note" }, fast: { q: 0.5, label: "Fast", note: "eighth note" },
+  ultrafast: { q: 0.25, label: "Ultra fast", note: "sixteenth note" } };
+function shippedSpeed(a) { return a.tempoUs / 2 < 200000 ? "medium" : "fast"; }
+function speedOf(t) { return store.speed || shippedSpeed(t.art); }
+function frameUsAt(a, k) { return Math.round(a.tempoUs * SPEEDS[k].q); }
+function sec(us) { return (us / 1e6).toFixed(6).replace(/0+$/, "").replace(/\\.$/, ""); }
+function msAt(a, k) { return +(frameUsAt(a, k) / 1000).toFixed(1) + " ms"; }
+// Retimes the Synced sprite (its <animate attributeName='x' ... calcMode='discrete'>) and nothing else: the card's
+// rim, opacity and logo animates, which Card synced sets, keep their durations. At the shipped step the art is untouched.
+function speedArt(t, art) {
+  var a = t.art, k = speedOf(t);
+  if (!a.animated || !(a.tempoUs > 0) || k === shippedSpeed(a)) return art;
+  var m = /(src="data:image\\/svg\\+xml;base64,)([^"]+)"/.exec(art); if (!m) return art;
+  var svg = atob(m[2]), re = /(<animate attributeName='x' values='[^']*' dur=')[0-9.]+(s' calcMode='discrete')/;
+  if (!re.test(svg)) return art;
+  svg = svg.replace(re, function (x, p, q) { return p + sec(frameUsAt(a, k) * a.frames) + q; });
+  return art.slice(0, m.index) + m[1] + btoa(svg) + art.slice(m.index + m[0].length - 1);
+}
+// what a rating was made with: "static", "gif", or the speed step in effect
+function artTag(t) { return t.art.animated === false ? "static" : store.art === "gif" ? "gif" : speedOf(t); }
+function tagText(t, tag) {
+  if (tag === "static") return "static art";
+  if (tag === "gif") return "original GIF art";
+  if (!SPEEDS[tag] || !(t.art.tempoUs > 0)) return "";
+  var ship = shippedSpeed(t.art);
+  return "Synced " + SPEEDS[tag].label + ", one frame per " + SPEEDS[tag].note + ", " + msAt(t.art, tag) + (tag === ship ? " (shipped)" : " (shipped: " + SPEEDS[ship].note + ")");
+}
+var store = { r: {}, g: {}, last: "", art: "synced", card: false, lab: null, test: "", speed: "", v: 1 };
 // The page's own button settings, as shipped (the head stylesheet's :root custom properties)
 var SHIP = (function () { var o = {}, ok = true; ["min", "max", "target"].forEach(function (k) {
   var m = new RegExp("--play-" + k + ":([0-9.]+)px").exec(F.head); if (m) o[k] = +m[1]; else ok = false; });
@@ -310,7 +362,7 @@ function labArt(art) {
 function labStyle() { if (!labOn()) return ""; var l = store.lab;
   return '<style id="sound-check-lab">:root{--play-min:' + l.min + 'px;--play-max:' + l.max + 'px;--play-target:' + l.target + "px}</style>"; }
 try { var raw = localStorage.getItem(KEY); if (raw) { var o = JSON.parse(raw); if (o && typeof o === "object") { store.r = o.r || {}; store.g = o.g || {}; store.last = o.last || ""; store.art = o.art === "gif" ? "gif" : "synced";
-  if (o.lab && typeof o.lab === "object" && [o.lab.min, o.lab.max, o.lab.target, o.lab.s].every(function (x) { return typeof x === "number" && x > 0; })) store.lab = { min: o.lab.min, max: o.lab.max, target: o.lab.target, s: o.lab.s }; store.card = !!o.card; store.test = TESTS[o.test] ? o.test : "";
+  if (o.lab && typeof o.lab === "object" && [o.lab.min, o.lab.max, o.lab.target, o.lab.s].every(function (x) { return typeof x === "number" && x > 0; })) store.lab = { min: o.lab.min, max: o.lab.max, target: o.lab.target, s: o.lab.s }; store.card = !!o.card; store.test = TESTS[o.test] ? o.test : ""; store.speed = SPEEDS[o.speed] ? o.speed : "";
 } } } catch (e) {}
 function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} }
 save();
@@ -321,7 +373,7 @@ var idx = 0, frame = null, noteTimer = 0;
 function byId(id) { for (var i = 0; i < T.length; i++) if (T[i].id === id) return i; return -1; }
 function label(t) { return t.sectionId + "." + t.id.slice(1); }
 
-$("intro").textContent = T.length + " tracks. Each is the complete animation_url page of onchain-midi-player " + (D.meta.playerVersion) + "'s reference Beast consumer (the player's engine, the NFT's own controls, art sync and background audio, the track's settings, MIDI and art), embedded in a sandboxed frame, and every track has its own animated Beast (all 75 genesis species appear). The art defaults to Synced (sprite sheet stepped on the beat and seeked to the music); switch to the original GIF to compare (a GIF runs on its own clock). Results are saved on this device.";
+$("intro").textContent = T.length + " tracks. Each is the complete animation_url page of onchain-midi-player " + (D.meta.playerVersion) + "'s reference Beast consumer (the player's engine, the NFT's own controls, art sync and background audio, the track's settings, MIDI and art), embedded in a sandboxed frame, and every track has its own animated Beast (all 75 genesis species appear). The art defaults to Synced (sprite sheet stepped on the beat and seeked to the music); switch to the original GIF to compare (a GIF runs on its own clock). Animation speed sets how many notes each Synced frame lasts; by default it is as shipped (an eighth note, or a quarter note above 150 BPM). Results are saved on this device.";
 var meta = D.meta || {};
 $("foot").textContent = "Player " + meta.playerVersion + ", " + (meta.beastCommit || "") + ", " + (meta.ompCommit || "") + ". Generated " + (meta.generated || "").slice(0, 10) + ".";
 
@@ -405,7 +457,17 @@ function paintArt() {
   $("aGif").setAttribute("aria-pressed", synced ? "false" : "true");
   $("aSync").setAttribute("aria-pressed", synced ? "true" : "false");
   $("cardSync").checked = !!store.card; $("cardSync").disabled = !synced;
-  $("artinfo").textContent = "Beast: " + a.name + " (" + (a.shiny ? "shiny" : "regular") + ", " + (a.animated === false ? "static, PNG " + a.spriteBytes + " B" : "animated, " + a.frames + " frames; GIF " + a.gifBytes + " B, sprite sheet " + a.spriteBytes + " B; frame " + a.frameMs + " ms") + "); tempo " + a.bpm + " BPM. The song's notes scroll behind it.";
+  var animated = a.animated !== false, k = speedOf(t), ship = shippedSpeed(a);
+  Array.prototype.forEach.call(document.querySelectorAll("[data-speed]"), function (b) {
+    var key = b.getAttribute("data-speed");
+    b.setAttribute("aria-pressed", animated && key === k ? "true" : "false"); b.disabled = !(synced && animated);
+    b.classList.toggle("ship", animated && key === ship);
+  });
+  $("speedship").hidden = !store.speed;
+  $("speedwhy").textContent = !animated ? "Off: this Beast is a static PNG, with no frames to time." : !synced ? "Off for the original GIF: it keeps its own clock, the baseline to compare with." : "Dashed: the shipped speed at this tempo.";
+  var gif = a.gifMs && a.gifMs.length ? (a.gifMs.every(function (x) { return x === a.gifMs[0]; }) ? a.gifMs[0] : a.gifMs.join("/")) + " ms" : "?";
+  $("artinfo").textContent = "Beast: " + a.name + " (" + (a.shiny ? "shiny" : "regular") + ", " + (a.animated === false ? "static, PNG " + a.spriteBytes + " B" : "animated, " + a.frames + " frames; GIF " + a.gifBytes + " B, sprite sheet " + a.spriteBytes + " B") + "); tempo " + a.bpm + " BPM." +
+    (animated ? " Synced: " + msAt(a, k) + " per frame, one per " + SPEEDS[k].note + " (" + SPEEDS[k].label + "); shipped: " + SPEEDS[ship].note + " (" + msAt(a, ship) + "). GIF: " + gif + " per frame, on its own clock." : "") + " The song's notes scroll behind it.";
 }
 function setArt(mode, card) {
   if (mode !== undefined) store.art = mode;
@@ -417,12 +479,18 @@ $("aSync").addEventListener("click", function () { setArt("synced"); });
 $("cardSync").addEventListener("change", function () { setArt(undefined, $("cardSync").checked); });
 // Engine test: ?test=<mode> in the URL selects one too (for a link to send).
 (function () { var q = /[?&]test=([a-z0-9_]+)/.exec(location.search); if (q && TESTS[q[1]]) store.test = q[1]; })();
+// Animation speed: ?speed=<ultraslow|slow|medium|fast|ultrafast|shipped> in the URL selects one too.
+(function () { var q = /[?&]speed=([a-z]+)/.exec(location.search); if (q && (SPEEDS[q[1]] || q[1] === "shipped")) store.speed = SPEEDS[q[1]] ? q[1] : ""; })();
+function setSpeed(k) { store.speed = SPEEDS[k] ? k : ""; save(); paintArt(); mountFrame(T[idx]); }
+Array.prototype.forEach.call(document.querySelectorAll("[data-speed]"), function (b) { b.addEventListener("click", function () { setSpeed(b.getAttribute("data-speed")); }); });
+$("speedship").addEventListener("click", function () { setSpeed(""); });
 function paintTest() { $("etest").value = store.test; $("etestinfo").textContent = store.test ? "Engine test on: the meter is at the top left of the player. Reload the track after changing the mode (choosing it here does)." : ""; }
 $("etest").addEventListener("change", function () { store.test = TESTS[$("etest").value] ? $("etest").value : ""; save(); paintTest(); mountFrame(T[idx]); });
 paintTest();
 function setRate(s) {
   var t = T[idx], r = store.r[t.id] || (store.r[t.id] = {});
   r.s = r.s === s ? "" : s;
+  if (r.s) r.sp = artTag(t); else delete r.sp;
   $("bp").setAttribute("aria-pressed", r.s === "pass" ? "true" : "false");
   $("bf").setAttribute("aria-pressed", r.s === "fail" ? "true" : "false");
   save(); paintRow(t.id); paintCounts();
@@ -445,13 +513,15 @@ function summary() {
   T.forEach(function (t) {
     var r = store.r[t.id] || {};
     if (r.s === "pass") pass++; else if (r.s === "fail") fail++;
-    if (r.s || r.n) lines.push((r.s ? r.s.toUpperCase() : "NOTE") + " " + label(t) + " " + t.title + (r.n ? " - " + r.n.replace(/\\s+/g, " ") : ""));
+    var sp = r.s && r.sp ? tagText(t, r.sp) : "";
+    if (r.s || r.n) lines.push((r.s ? r.s.toUpperCase() : "NOTE") + " " + label(t) + " " + t.title + (sp ? " [" + sp + "]" : "") + (r.n ? " - " + r.n.replace(/\\s+/g, " ") : ""));
     else untested.push(label(t));
   });
   var g = Object.keys(store.g).filter(function (k) { return store.g[k]; });
   var out = ["Beast Sound Check results", new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC", navigator.userAgent,
     "Player " + meta.playerVersion + ", " + meta.ompCommit + "; music " + meta.beastCommit + "; built " + (meta.generated || "").slice(0, 16),
-    labOn() ? "Design lab override (not the shipped page): " + labText() : "Play button: shipped settings", "",
+    labOn() ? "Design lab override (not the shipped page): " + labText() : "Play button: shipped settings",
+    "Animation speed now: " + (store.speed ? SPEEDS[store.speed].label + " (one frame per " + SPEEDS[store.speed].note + ") on every animated Beast" : "shipped (an eighth note per frame, a quarter note above 150 BPM)") + "; a rated track shows the art and speed it was rated with", "",
     "Pass " + pass + ", fail " + fail + ", untested " + (T.length - pass - fail) + " of " + T.length,
     "Global checklist ticked: " + (g.length ? g.join(", ") : "none"), ""];
   return out.concat(lines.filter(function (l) { return l.indexOf("FAIL") === 0; }), lines.filter(function (l) { return l.indexOf("FAIL") !== 0; }),
