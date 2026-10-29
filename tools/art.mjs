@@ -1,7 +1,9 @@
-// Beast card art for the listening-test site: the real Beasts V3 card markup (beasts-v3
-// assets/examples/warlock_shiny_animated.svg, the renderer's output) with the Beast's own genesis GIF
-// (assets/genesis/{regular,shiny}-gif), plus the "synced" variant: the GIF decoded into one PNG sprite sheet,
-// stepped by SMIL <animate calcMode='discrete'> at a beat-derived frame length (beasts-v3 issue 132).
+// Beast card art for the listening-test site: the real Beasts V3 card markup (beasts-v3's renderer fixtures,
+// fixtures/renderer/*/raw.svg, the renderer's own output: a regular and a shiny card) with the Beast's own
+// genesis art, animated (assets/genesis/{regular,shiny}-gif) or static ({regular,shiny}-png), plus the "synced"
+// variant: the GIF decoded into one PNG sprite sheet, stepped by SMIL <animate calcMode='discrete'> at a
+// beat-derived frame length (beasts-v3 issue 132). The card's art-frame background carries data-notes-bg, so
+// the page draws the token's notes behind the Beast (beasts-v3 #218, onchain-midi-player's notes fragment).
 import { createRequire } from "node:module";
 import fs from "node:fs";
 import zlib from "node:zlib";
@@ -12,7 +14,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const { GifReader } = createRequire(import.meta.url)(path.join(here, "deps/node_modules/omggif"));
 const B3 = process.env.BEASTS3 || "/workspace/beasts-v3";
 const GENESIS = B3 + "/assets/genesis";
-const TEMPLATE = fs.readFileSync(B3 + "/assets/examples/warlock_shiny_animated.svg", "utf8");
+const fixture = (name) => fs.readFileSync(`${B3}/fixtures/renderer/${name}/raw.svg`, "utf8").replace(/\r?\n\s*/g, "");
+const TEMPLATE = { regular: fixture("regular-animated-tier-4-rank-2-opaque-gif"), shiny: fixture("shiny-animated-tier-3-rank-1242-transparent-gif") };
 
 const crc = (buf) => zlib.crc32(buf);
 const chunk = (type, data) => {
@@ -74,16 +77,23 @@ const cache = new Map();
 /** Transparent gap, in source pixels, between sprite frames and around the sheet (stops texture bleed at fractional zoom). */
 export let GUTTER = 2;
 export const setGutter = (g) => { GUTTER = g; };
-export function speciesArt(id, shiny) {
-  const key = id + (shiny ? "s" : "r") + GUTTER;
+export function speciesArt(id, shiny, animated = true) {
+  const key = id + (shiny ? "s" : "r") + (animated ? "a" : "p") + GUTTER;
   if (cache.has(key)) return cache.get(key);
+  if (!animated) { // the static genesis PNG: one frame, shown as it is
+    const dir = `${GENESIS}/${shiny ? "shiny" : "regular"}-png`;
+    const file = fs.readdirSync(dir).find((f) => f.startsWith(String(id).padStart(2, "0") + "-"));
+    const png = fs.readFileSync(`${dir}/${file}`);
+    const r = { id, shiny, animated: false, file, gutter: GUTTER, n: 1, delays: [0], gif: null, gifUri: null, png, pngUri: "data:image/png;base64," + png.toString("base64") };
+    cache.set(key, r); return r;
+  }
   const dir = `${GENESIS}/${shiny ? "shiny" : "regular"}-gif`;
   const file = fs.readdirSync(dir).find((f) => f.startsWith(String(id).padStart(2, "0") + "-"));
   const gif = fs.readFileSync(`${dir}/${file}`);
   const d = decodeGif(gif);
   if (d.w !== 32 || d.h !== 32) throw new Error(`${file}: ${d.w}x${d.h}`);
   const png = spritePng(d, GUTTER);
-  const r = { id, shiny, file, gutter: GUTTER, n: d.frames.length, delays: d.delays, gif, png, gifUri: "data:image/gif;base64," + gif.toString("base64"), pngUri: "data:image/png;base64," + png.toString("base64") };
+  const r = { id, shiny, animated: true, file, gutter: GUTTER, n: d.frames.length, delays: d.delays, gif, png, gifUri: "data:image/gif;base64," + gif.toString("base64"), pngUri: "data:image/png;base64," + png.toString("base64") };
   cache.set(key, r); return r;
 }
 
@@ -93,53 +103,55 @@ const sec = (us) => (us / 1e6).toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
 const TIER_COLOR = ["#ffffff", "#ff8800", "#8c00bf", "#0000ff", "#00ff00", "#ffffff"];
 const esc = (s) => String(s).replace(/[<>&']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;" }[c]));
 
+const RANK_COLOR = ["#ffffff", "#e6c56e", "#c0c0c0", "#cd7f32"];
+const PIXELATED = "image-rendering:pixelated; image-rendering:-moz-crisp-edges; -ms-interpolation-mode:nearest-neighbor;";
+
 /**
- * The 250x350 Beasts card. mode: "gif" (the GIF as an <image>, as the renderer writes it today) or
- * "synced" (sprite sheet in a 32x32 clip stepped at the beat-derived frame length). cardSync (synced
- * only) also sets the card's own animations to beat multiples: rim 16 beats, opacity pulse 4 beats, logo 8.
+ * The 250x350 Beasts card, from the renderer's own regular or shiny card. mode: "gif" (the genesis GIF in the
+ * renderer's 160x160 art box, as it writes it today) or "synced" (sprite sheet stepped at the beat-derived frame
+ * length). A static Beast (art.animated false) shows its PNG in both. cardSync (synced only) also sets the card's
+ * own animations to beat multiples: rim 16 beats, opacity pulse 4 beats, logo 8.
  */
 export function card({ beast, art, tempoUs, mode, cardSync = false, strings, mediaTitle = "", staticFrame = null }) {
-  let s = TEMPLATE;
+  let s = beast.shiny ? TEMPLATE.shiny : TEMPLATE.regular;
   const sub = (re, rep) => { if (!re.test(s)) throw new Error("template: " + re); s = s.replace(re, rep); };
-  if (!beast.shiny) {
-    sub(/(Z' )fill='url\(#logo_pastel_rainbow\)'\/>/, `$1fill='${TIER_COLOR[beast.tier] || "#ffffff"}'/>`);
-    sub(/stroke='url\(#shinyRim\)' stroke-width='4'\/><\/svg>/, "stroke='url(#gold)' stroke-width='4'/></svg>");
-  }
-  const crown = /<use href='#crown'[^>]*\/><text[^>]*>1<\/text>/;
-  if (beast.rank === 0 || beast.rank === undefined) sub(crown, "");
-  else if (beast.rank > 1) sub(crown, `<use href='#trophy' x='218' y='9' width='20' height='20'/><text x='227' y='43' text-anchor='middle' style='fill:#b0b0b6;font-size:19px;'>${beast.rank}</text>`);
-  const nameRe = /<text x='125' y='26'[^>]*>[^<]*<\/text><text x='125' y='50'[^>]*>[^<]*<\/text>/;
+  if (!beast.shiny) sub(/(Z' )fill='#[0-9a-fA-F]{6}'/, `$1fill='${TIER_COLOR[beast.tier] || "#ffffff"}'`);
+  const rankRe = /<text x='[0-9.]+' y='23\.96' text-anchor='end' class='label'[^>]*>RANK<\/text><text x='[0-9.]+' y='46' text-anchor='end' style='fill:#[0-9a-fA-F]{6};font-size:22px'>[0-9]+<\/text>/;
+  if (!beast.rank) sub(rankRe, "");
+  else sub(rankRe, (m) => m.replace(/style='fill:#[0-9a-fA-F]{6}/, `style='fill:${RANK_COLOR[beast.rank] || RANK_COLOR[0]}`).replace(/>[0-9]+<\/text>$/, `>${beast.rank}</text>`));
+  const nameRe = /<text x='125\.5' y='22\.84'[^>]*>[^<]*<\/text><text x='125\.5' y='46'[^>]*>[^<]*<\/text>/;
   const title = esc(strings.name);
   if (beast.prefix || beast.suffix) {
     const pre = [strings.prefix, strings.suffix].filter(Boolean).join(" ");
-    sub(nameRe, `<text x='125' y='26' text-anchor='middle' style='fill:#fff;font-size:14px;letter-spacing:1px'>"${esc(pre)}"</text><text x='125' y='50' text-anchor='middle' style='fill:#fff;font-size:30px;letter-spacing:1px'>${title}</text>`);
-  } else sub(nameRe, `<text x='125' y='47' text-anchor='middle' style='fill:#fff;font-size:34px;letter-spacing:1px'>${title}</text>`);
+    sub(nameRe, `<text x='125.5' y='22.84' text-anchor='middle' style='fill:#fff;font-size:14px;letter-spacing:1px'>"${esc(pre)}"</text><text x='125.5' y='46' text-anchor='middle' style='fill:#fff;font-size:30px;letter-spacing:1px'>${title}</text>`);
+  } else sub(nameRe, `<text x='125.5' y='46' text-anchor='middle' style='fill:#fff;font-size:34px;letter-spacing:1px'>${title}</text>`);
   const vals = [String(beast.tier), String(beast.level), strings.type, String(beast.level * Math.max(1, 6 - beast.tier)), String(beast.health)];
   let k = 0;
-  s = s.replace(/(class='valL'>)[^<]*(<)/g, (_, a, b) => a + vals[k++] + b);
+  s = s.replace(/(class='valL'[^>]*>)[^<]*(<)/g, (_, a, b) => a + esc(vals[k++]) + b);
   if (k !== 5) throw new Error("template: valL count " + k);
   let image;
-  if (mode === "gif") image = `<image x='1' y='1' width='128' height='128' style='image-rendering:pixelated; image-rendering:-moz-crisp-edges; -ms-interpolation-mode:nearest-neighbor;' href='${art.gifUri}'></image>`;
-  else {
+  if (!art.animated || mode === "gif") {
+    const uri = art.animated ? art.gifUri : art.pngUri;
+    image = `<foreignObject x='0' y='0' width='160' height='160'><xhtml:img xmlns:xhtml='http://www.w3.org/1999/xhtml' src='${uri}' style='width:100%;height:100%;${PIXELATED}'/></foreignObject>`;
+  } else {
     // cell i is (32 + 2g) square with the frame centred (g px of transparent margin all round); the frame is shown by moving
     // the image so it sits exactly in the 32x32 window, which therefore never touches a neighbour's (or the sheet's) pixels
     const g = art.gutter ?? 0, step = 32 + 2 * g, W = step * art.n, H = 32 + 2 * g;
     const fl = frameUs(art.n, tempoUs), values = Array.from({ length: art.n }, (_, i) => -(g + i * step)).join(";");
     const anim = staticFrame === null ? `<animate attributeName='x' values='${values}' dur='${sec(fl * art.n)}s' calcMode='discrete' repeatCount='indefinite'/>` : "";
     const x0 = staticFrame === null ? 0 : -(g + staticFrame * step);
-    image = `<svg x='1' y='1' width='128' height='128' viewBox='0 0 32 32'><image x='${x0}' y='${-g}' width='${W}' height='${H}' style='image-rendering:pixelated; image-rendering:-moz-crisp-edges; -ms-interpolation-mode:nearest-neighbor;' href='${art.pngUri}'>${anim}</image></svg>`;
+    image = `<svg x='0' y='0' width='160' height='160' viewBox='0 0 32 32'><image x='${x0}' y='${-g}' width='${W}' height='${H}' style='${PIXELATED}' href='${art.pngUri}'>${anim}</image></svg>`;
   }
-  sub(/<image x='1' y='1'[^>]*href='data:image\/gif;base64,[^']*'><\/image>/, () => image);
-  if (cardSync && mode === "synced") {
-    sub(/(attributeName='gradientTransform'[^>]*?)dur='6s'/, `$1dur='${sec(tempoUs * 16)}s'`);
+  sub(/<foreignObject x='0' y='0' width='160' height='160'>[\s\S]*?<\/foreignObject>/, () => image);
+  if (cardSync && mode === "synced" && art.animated) {
+    s = s.replace(/(attributeName='gradientTransform'[^>]*?)dur='6s'/, `$1dur='${sec(tempoUs * 16)}s'`);
     sub(/(attributeName='opacity' dur=)'2.2s'/, `$1'${sec(tempoUs * 4)}s'`);
     sub(/(attributeName='opacity' values='0.6;1;0.6' )dur='3s'/, `$1dur='${sec(tempoUs * 8)}s'`);
   }
-  // the top-right corner of the black art frame (rect x=15 y=58 220x144 in the 250x350 card) and a button diameter of 24 card units
-  // (9.6% of the card's width: about 22 px on a phone-sized card, 40 px on a desktop-sized one): where a player may put its play button
-  sub(/^<svg /, () => `<svg data-play-anchor="235 58 24 top-right" `);
-  // a <title> is what navigator.mediaSession shows (player 0.4.0); the real card has none yet, so previews add one
-  if (mediaTitle) sub(/^(<svg [^>]*>)/, (m, open) => `${open}<title>${esc(mediaTitle)}</title>`);
+  // the renderer's play anchor: the top-right corner of the art frame (rect x=15 y=54 220x170), 24 card units across
+  sub(/ data-play-anchor='([^']*)'/, (m, v) => ` data-play-anchor="${v}"`);
+  // a <title> is what navigator.mediaSession shows; previews name the track
+  sub(/<title>[^<]*<\/title>/, () => (mediaTitle ? `<title>${esc(mediaTitle)}</title>` : ""));
   return s;
 }
 

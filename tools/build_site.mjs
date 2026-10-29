@@ -14,13 +14,13 @@ const V = data.meta.playerVersion;
 const BANNER = "";
 // Engine test (opt-in, off by default): injected into the NFT page's head ahead of the engine. It sets the
 // AudioContext latency hint and the sequencer lookahead (preroll) for an A/B on a phone, and paints a meter:
-// Chrome's AudioRenderCapacity load and underruns where available, the longest main-thread stall, and the
-// lookahead in effect. M: { label, hint: true ("playback") | false (default) | null (as shipped), preroll: s | null }.
+// Chrome's AudioContext.playbackStats underruns where available (Chrome 146+), the longest main-thread stall,
+// and the lookahead in effect. M: { label, hint: true ("playback") | false (default) | null (as shipped), preroll: s | null }.
 function engineTest(M) {
   "use strict";
   var W = window, R = W.AudioContext || W.webkitAudioContext, box = null;
   if (!R) return;
-  var st = { ctx: null, pre: null, cap: "waiting for audio", avg: null, peak: 0, now: null, under: 0, first: null, stall: 0, firstStall: null };
+  var st = { ctx: null, pre: null, cap: "waiting for audio", now: null, under: 0, first: null, stall: 0, firstStall: null };
   function A(o) {
     var c = M.hint === null ? (o === undefined ? new R() : new R(o)) : M.hint ? new R({ latencyHint: "playback" }) : new R();
     if (!st.ctx) { st.ctx = c; watch(c); }
@@ -34,20 +34,14 @@ function engineTest(M) {
     get: function () { return real && function (o) { var s = new real(o); if (M.preroll !== null) s.preroll = M.preroll; st.pre = s.preroll; paint(); return s; }; } });
   function at() { return st.ctx ? st.ctx.currentTime : 0; }
   function watch(c) {
-    var rc = c.renderCapacity;
-    if (rc && typeof rc.start === "function") {
-      st.cap = "on";
-      rc.addEventListener("update", function (e) {
-        st.avg = e.averageLoad; st.peak = Math.max(st.peak, e.peakLoad); st.now = e.underrunRatio;
-        if (e.underrunRatio > 0) { st.under++; if (st.first === null) st.first = at(); }
-        paint();
-      });
-      try { rc.start({ updateInterval: 1 }); } catch (e) { st.cap = "could not start"; }
-    } else st.cap = "not available in this browser";
+    // AudioContext.playbackStats (Chrome 146+): cumulative underrun events and duration; renderCapacity is not shipped
+    st.cap = c.playbackStats ? "on" : "not available in this browser (needs Chrome 146+)";
     var last = performance.now();
     setInterval(function () {
       var p = performance.now(), gap = p - last - 100; last = p;
       if (c.state === "running") { if (gap > st.stall) st.stall = gap; if (gap > 150 && st.firstStall === null) st.firstStall = at(); }
+      var ps = c.playbackStats;
+      if (ps) { st.under = ps.underrunEvents; st.now = ps.underrunDuration; if (ps.underrunEvents > 0 && st.first === null) st.first = at(); }
       paint();
     }, 100);
   }
@@ -66,8 +60,8 @@ function engineTest(M) {
       c ? "audio clock " + c.currentTime.toFixed(1) + " s, " + c.state + ", " + c.sampleRate + " Hz" : "audio not started",
       c ? "base latency " + ms(c.baseLatency) + ", output latency " + ms(c.outputLatency) : "",
       "lookahead " + (st.pre === null ? "?" : st.pre + " s"),
-      "load: " + (st.cap === "on" ? "average " + pct(st.avg) + ", peak " + pct(st.peak) + ", underruns now " + pct(st.now) : st.cap),
-      st.cap === "on" ? "first underrun " + (st.first === null ? "none" : "at " + st.first.toFixed(1) + " s") + ", seconds with underruns " + st.under : "",
+      "underruns: " + (st.cap === "on" ? st.under + " (" + ms(st.now) + " in all)" : st.cap),
+      st.cap === "on" ? "first underrun " + (st.first === null ? "none" : "at about " + st.first.toFixed(1) + " s") : "",
       "longest main-thread stall " + Math.round(st.stall) + " ms" + (st.firstStall === null ? "" : ", first over 150 ms at " + st.firstStall.toFixed(1) + " s"),
     ].filter(Boolean).join("\n");
   }
@@ -366,7 +360,7 @@ function paintArt() {
   $("aGif").setAttribute("aria-pressed", synced ? "false" : "true");
   $("aSync").setAttribute("aria-pressed", synced ? "true" : "false");
   $("cardSync").checked = !!store.card; $("cardSync").disabled = !synced;
-  $("artinfo").textContent = "Beast: " + a.name + " (" + (a.shiny ? "shiny" : "regular") + "), " + a.frames + " frames; GIF " + a.gifBytes + " B, sprite sheet " + a.spriteBytes + " B; tempo " + a.bpm + " BPM, frame " + a.frameMs + " ms.";
+  $("artinfo").textContent = "Beast: " + a.name + " (" + (a.shiny ? "shiny" : "regular") + ", " + (a.animated === false ? "static, PNG " + a.spriteBytes + " B" : "animated, " + a.frames + " frames; GIF " + a.gifBytes + " B, sprite sheet " + a.spriteBytes + " B; frame " + a.frameMs + " ms") + "); tempo " + a.bpm + " BPM. The song's notes scroll behind it.";
 }
 function setArt(mode, card) {
   if (mode !== undefined) store.art = mode;

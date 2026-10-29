@@ -129,16 +129,16 @@ const warn = [];
 const TYPE_NAMES = ["Magic", "Hunter", "Brute"];
 const sp = (id) => ({ tier: genesisTier(id), type: genesisType(id), name: TABLES.species[id - 1] });
 const reserved = new Set([1, 53]); // e2e Warlock and e2e heaviest
-const cardBeast = (id, shiny, extra = {}) => {
+const cardBeast = (id, shiny, extra = {}, animated = true) => {
   const t = sp(id), level = 20 + ((id * 7) % 60);
   const prefix = 1 + ((id * 7) % 69), suffix = 1 + ((id * 11) % 18);
-  return { id, prefix, suffix, rank: 100 + id * 7, level, health: 100 + ((id * 13) % 300), shiny: shiny ? 1 : 0, animated: 1, tier: t.tier, beast_type: t.type, ...extra };
+  return { id, prefix, suffix, rank: 100 + id * 7, level, health: 100 + ((id * 13) % 300), shiny: shiny ? 1 : 0, animated: animated ? 1 : 0, tier: t.tier, beast_type: t.type, ...extra };
 };
 let artQueue = null; const usedArt = [], dealt = [];
 function nextArt(prefN) {
   if (!artQueue) throw new Error("art queue not built");
-  if (!artQueue.length) artQueue = dealt.splice(0).map((q) => ({ id: q.id, shiny: !q.shiny })); // all dealt: the other variants
-  let k = prefN ? artQueue.findIndex((q) => ART.speciesArt(q.id, q.shiny).n === prefN) : 0;
+  if (!artQueue.length) artQueue = dealt.splice(0).map((q) => ({ id: q.id, shiny: !q.shiny, animated: q.animated })); // all dealt: the other variants
+  let k = prefN ? artQueue.findIndex((q) => ART.speciesArt(q.id, q.shiny, q.animated).n === prefN) : 0;
   if (k < 0) k = 0;
   const a = artQueue.splice(k, 1)[0]; if (!a) throw new Error("art queue empty");
   dealt.push(a);
@@ -154,8 +154,8 @@ function add({ section, title, blurb, checks, settings, midi, beast: beastIn, st
   return id;
 }
 function build({ id, section, title, blurb, checks, settings, midi, pick, stringsIn }) {
-  const beast = pick.beast || cardBeast(pick.id, pick.shiny);
-  const art = ART.speciesArt(beast.id, !!beast.shiny);
+  const beast = pick.beast || cardBeast(pick.id, pick.shiny, {}, pick.animated !== false);
+  const art = ART.speciesArt(beast.id, !!beast.shiny, beast.animated !== 0);
   const tempoUs = ART.midiTempoUs(midi), bpm = 60e6 / tempoUs;
   const bpmText = `${+bpm.toFixed(2)} BPM`;
   // the card shows the Beast's canonical name; the test label is the site's track title
@@ -183,14 +183,15 @@ function build({ id, section, title, blurb, checks, settings, midi, pick, string
   });
   const fl = ART.frameUs(art.n, tempoUs);
   const sub = tempoUs / 2 < 200000 ? "quarter note (the eighth would be under 0.2 s)" : "eighth note";
-  const artChecks = [
+  const notesCheck = "Notes: the song's own MIDI scrolls right to left behind the Beast in the art frame, one colour per channel, drums as ticks along the bottom; each note sounds as it reaches the playhead near the left edge. They stand still before play, freeze on pause, and loop with the music.";
+  const artChecks = !art.animated ? [notesCheck, `Static Beast: ${strings.name}, ${beast.shiny ? "shiny" : "regular"} (the genesis PNG, no animation). The art buttons all show the same picture.`] : [notesCheck,
     `Art frames flip on the eighth notes (quarter notes above 150 BPM). Synced art, the default: ${strings.name}, ${beast.shiny ? "shiny" : "regular"}, ${art.n} frames, one per ${sub} at ${bpm.toFixed(2)} BPM (${(fl / 1000).toFixed(1)} ms); ${art.n === 5 ? "5 frames cycle every 5 steps and realign only at the loop; " : art.n === 3 || art.n === 6 ? "the " + art.n + "-frame cycle does not divide a bar, so a downbeat falls on different frames within a pass; " : ""}no drift to the end of the pass.`,
     `The art snaps cleanly at each loop and looks identical to the GIF apart from timing. Tap "Original GIF" above to compare (its frames run at the GIF's own 0.2 s and slide against the music).${art.delays.some((x) => x !== art.delays[0]) ? " This species' GIF has uneven frame delays (" + art.delays.map((x) => x * 10).join("/") + " ms); the sprite uses regular frames." : ""}`,
   ];
   tracks.push({
     id, sectionId: section[0], section: section.slice(2), title, blurb, checks: [...checks, ...artChecks],
     midiBytes: midi.length, settingsBytes: settings_len,
-    art: { id: beast.id, name: strings.name, shiny: !!beast.shiny, frames: art.n, gifBytes: art.gif.length, spriteBytes: art.png.length, bpm: +bpm.toFixed(2), frameMs: +(fl / 1000).toFixed(1) },
+    art: { id: beast.id, name: strings.name, shiny: !!beast.shiny, animated: !!art.animated, frames: art.n, gifBytes: art.gif ? art.gif.length : 0, spriteBytes: art.png.length, bpm: +bpm.toFixed(2), frameMs: +(fl / 1000).toFixed(1) },
     d, pages,
   });
   return id;
@@ -303,10 +304,11 @@ SLOTS.forEach(([type, mega, tier, want], i) => {
 }
 
 // ---- the species queue for the other tracks: remaining species in order, alternating regular and shiny
-// (each track gets its own species while they last; nextArt then deals the other variants)
+// (each track gets its own species while they last; nextArt then deals the other variants), rotating through
+// shiny animated, regular animated, shiny static and regular static
 {
   const rest = []; for (let id = 1; id <= 75; id++) if (!reserved.has(id)) rest.push(id);
-  artQueue = rest.map((id, i) => ({ id, shiny: i % 2 === 0 }));
+  artQueue = rest.map((id, i) => ({ id, shiny: i % 2 === 0, animated: Math.floor(i / 2) % 2 === 0 }));
 }
 // Tempo spread for raw-sound checks whose content does not depend on tempo, with a spread of frame counts
 const TEMPOS = [90, 100, 120, 127.66, 131.87, 150, 175];

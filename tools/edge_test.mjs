@@ -36,9 +36,9 @@ for (const n of [2, 3, 4, 5, 6]) {
       await page.setContent(`<body style="margin:0;background:#000"><img id=i style="display:block;width:${250 * css}px;height:${350 * css}px" src="data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}"></body>`);
       await page.waitForFunction(() => document.getElementById("i").complete);
       await page.waitForTimeout(60);
-      // the whole viewport, read in device pixels: the columns/rows the window (62,66)-(190,194) touches, partial edge pixels included
+      // the whole viewport, read in device pixels: the columns/rows the window (45,59)-(205,219) touches, partial edge pixels included
       const shot = decode(await page.screenshot());
-      const S = css * dsf, x0 = Math.floor(62 * S), x1 = Math.ceil(190 * S) - 1, y0 = Math.floor(66 * S), y1 = Math.ceil(194 * S) - 1;
+      const S = css * dsf, x0 = Math.floor(45 * S), x1 = Math.ceil(205 * S) - 1, y0 = Math.floor(59 * S), y1 = Math.ceil(219 * S) - 1;
       let m = 0, edge = "";
       for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const k = (y * shot.w + x) * 4; if (shot.data[k] > 40 && shot.data[k + 2] > 40 && shot.data[k + 1] < shot.data[k] * 0.6) { m++; if (!edge) edge = x === x0 ? "left" : x === x1 ? "right" : y === y0 ? "top" : y === y1 ? "bottom" : "inside"; } }
       checks++; worst = Math.max(worst, m); if (m) { bad++; hits.push(`n=${n} frame ${i + 1} dsf ${dsf} css ${css}: ${m} magenta px (${edge} edge)`); }
