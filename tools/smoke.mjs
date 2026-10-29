@@ -1,50 +1,107 @@
 #!/usr/bin/env node
-// Smoke test of index.html at a phone viewport (390x844) in Playwright Chromium and WebKit.
+// Smoke test of index.html at a phone viewport (390x844) in Playwright Chromium and WebKit, served over local http
+// (the real Beasts need a secure context for crypto.subtle, which localhost is; a file:// page cannot fetch the set).
 //   PLAYWRIGHT_CORE=<node_modules/playwright-core> PLAYWRIGHT_BROWSER=chromium|webkit node smoke.mjs [tracks per section]
+// Optional: PLAYWRIGHT_EXECUTABLE (the browser's launcher, where the default one cannot run), BEASTS3 (a beasts-v3
+// checkout: each real Beast's GIF is also checked against its canonical genesis file), SHOTS (a directory for
+// phone-width screenshots of the real-Beasts picker and the footer banner, light and dark).
 import { createRequire } from "node:module";
+import crypto from "node:crypto";
 import fs from "node:fs";
+import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import zlib from "node:zlib";
+import { openRenditionSet } from "./rendition_set.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.join(here, "..");
 const pw = createRequire(import.meta.url)(process.env.PLAYWRIGHT_CORE);
 const engine = process.env.PLAYWRIGHT_BROWSER || "chromium";
-const browser = await pw[engine].launch({ env: process.env });
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: engine !== "firefox" });
+
+// a static server for the site (the .gz files go out as application/gzip with no Content-Encoding, as GitHub Pages sends them)
+const TYPES = { ".html": "text/html; charset=utf-8", ".json": "application/json", ".gz": "application/gzip", ".wav": "audio/wav" };
+const server = http.createServer((req, res) => {
+  const u = new URL(req.url, "http://x"), p = path.normalize(path.join(ROOT, decodeURIComponent(u.pathname)));
+  const f = p.endsWith(path.sep) ? path.join(p, "index.html") : p;
+  if (!f.startsWith(ROOT) || !fs.existsSync(f) || !fs.statSync(f).isFile()) { res.writeHead(404); res.end(); return; }
+  res.writeHead(200, { "Content-Type": TYPES[path.extname(f)] || "application/octet-stream" }); fs.createReadStream(f).pipe(res);
+});
+await new Promise((r) => server.listen(0, "127.0.0.1", r));
+const ORIGIN = `http://127.0.0.1:${server.address().port}`;
+const SITE = process.env.SITE || "/index.html", URL0 = ORIGIN + SITE;
+
+const browser = await pw[engine].launch({ env: process.env, ...(process.env.PLAYWRIGHT_EXECUTABLE ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE } : {}) });
+const newCtx = async (o = {}) => {
+  const c = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: engine !== "firefox", ...o });
+  await c.addInitScript(() => {
+    for (const k of ["AudioContext", "webkitAudioContext"]) {
+      const A = window[k]; if (!A) continue;
+      window[k] = new Proxy(A, { construct(t, a, nt) { const o = Reflect.construct(t, a, nt); (window.__acs ||= []).push(o); window.__ac = o; return o; } });
+    }
+  });
+  await c.addInitScript(() => {
+    const MM = window.MediaMetadata;
+    if (MM) window.MediaMetadata = new Proxy(MM, { construct(t, a, nt) { (window.__mm ||= []).push(JSON.parse(JSON.stringify(a[0] || {}))); return Reflect.construct(t, a, nt); } });
+    const play = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function () { (window.__media ||= []).push(this); return play.apply(this, arguments); };
+  });
+  return c;
+};
+const ctx = await newCtx();
 const errors = [], requests = [];
-await ctx.addInitScript(() => {
-  for (const k of ["AudioContext", "webkitAudioContext"]) {
-    const A = window[k]; if (!A) continue;
-    window[k] = new Proxy(A, { construct(t, a, nt) { const o = Reflect.construct(t, a, nt); (window.__acs ||= []).push(o); window.__ac = o; return o; } });
-  }
-});
-await ctx.addInitScript(() => {
-  const MM = window.MediaMetadata;
-  if (MM) window.MediaMetadata = new Proxy(MM, { construct(t, a, nt) { (window.__mm ||= []).push(JSON.parse(JSON.stringify(a[0] || {}))); return Reflect.construct(t, a, nt); } });
-  const play = HTMLMediaElement.prototype.play;
-  HTMLMediaElement.prototype.play = function () { (window.__media ||= []).push(this); return play.apply(this, arguments); };
-});
-ctx.on("request", (r) => { const u = r.url(); if (!/^(file|data|blob|about):/.test(u)) requests.push(u); });
+// the site's own files (the page and the rendition set) are the only requests allowed; the players make none
+const allowed = (u) => u.startsWith(ORIGIN + "/index.html") || u === ORIGIN + "/" || u.startsWith(ORIGIN + "/renditions/");
+ctx.on("request", (r) => { const u = r.url(); if (!/^(file|data|blob|about):/.test(u) && !allowed(u)) requests.push(u); });
 const page = await ctx.newPage();
 page.on("console", (m) => { if (m.type() === "error") errors.push("console: " + m.text()); });
 page.on("pageerror", (e) => errors.push("pageerror: " + e));
 const results = [];
 const ok = (name, pass, detail = "") => { results.push({ name, pass, detail }); console.log(`${pass ? "PASS" : "FAIL"} ${name} ${detail}`); };
+const PREVIEW = true; // 0.7.0 pages always carry background audio and media controls
 
-const SITE = process.env.SITE || "../index.html", PREVIEW = true; // 0.7.0 pages always carry background audio and media controls
-await page.goto("file://" + path.join(here, SITE));
-console.log(engine, browser.version());
+function decodePng(buf) {
+  let p = 8, w = 0, h = 0, ct = 0; const idat = [];
+  while (p < buf.length) { const len = buf.readUInt32BE(p), type = buf.toString("latin1", p + 4, p + 8); const d = buf.subarray(p + 8, p + 8 + len);
+    if (type === "IHDR") { w = d.readUInt32BE(0); h = d.readUInt32BE(4); ct = d[9]; } else if (type === "IDAT") idat.push(d); p += 12 + len; }
+  const bpp = ct === 6 ? 4 : 3, raw = zlib.inflateSync(Buffer.concat(idat)), out = Buffer.alloc(w * h * bpp), stride = w * bpp;
+  for (let y = 0; y < h; y++) { const f = raw[y * (stride + 1)]; for (let x = 0; x < stride; x++) {
+    const v = raw[y * (stride + 1) + 1 + x], a = x >= bpp ? out[y * stride + x - bpp] : 0, b = y ? out[(y - 1) * stride + x] : 0, c = x >= bpp && y ? out[(y - 1) * stride + x - bpp] : 0;
+    out[y * stride + x] = (f === 0 ? v : f === 1 ? v + a : f === 2 ? v + b : f === 3 ? v + ((a + b) >> 1) : v + (() => { const pp = a + b - c, pa = Math.abs(pp - a), pb = Math.abs(pp - b), pc = Math.abs(pp - c); return pa <= pb && pa <= pc ? a : pb <= pc ? b : c; })()) & 255; } }
+  return { w, h, bpp, data: out };
+}
+const diffPx = (a, b) => { let n = 0; for (let i = 0; i < a.data.length; i += a.bpp) if (Math.abs(a.data[i] - b.data[i]) + Math.abs(a.data[i + 1] - b.data[i + 1]) + Math.abs(a.data[i + 2] - b.data[i + 2]) > 60) n++; return n; };
+
+// ---- the real Beasts, as Node rebuilds them: the expected animation_url page of every token
+const D0 = JSON.parse(/<script type="application\/json" id="data">([\s\S]*?)<\/script>/.exec(fs.readFileSync(path.join(ROOT, SITE), "utf8"))[1]);
+const SETINFO = D0.sepolia.sets[0], FT = D0.sepolia.footers;
+const SETDIR = path.join(ROOT, "renditions", SETINFO.dir);
+const set = await openRenditionSet((p) => fs.readFileSync(path.join(SETDIR, p)));
+const animationPage = (uri) => Buffer.from(JSON.parse(Buffer.from(uri.slice(uri.indexOf(",") + 1), "base64").toString("utf8")).animation_url.split(",")[1], "base64");
+const varOf = (t) => (t.kind === "genesis" ? "genesis" : "p" + t.visualEffects);
+const tokOf = (sid, v) => set.manifest.tokens.find((t) => t.speciesId === sid && varOf(t) === v);
+const sha = (b) => crypto.createHash("sha256").update(b).digest("hex");
+const gifOf = (html) => { const m = /<img id="beast-art"[^>]*src="data:image\/svg\+xml;base64,([^"]+)"/.exec(html); const svg = m ? Buffer.from(m[1], "base64").toString("utf8") : ""; const g = /data:image\/gif;base64,([A-Za-z0-9+/=]+)/.exec(svg); return g ? sha(Buffer.from(g[1], "base64")) : null; };
+const genesisGif = process.env.BEASTS3 ? new Map(JSON.parse(fs.readFileSync(path.join(process.env.BEASTS3, "assets/genesis/manifest.json"), "utf8")).assets.filter((a) => a.mime === "image/gif").map((a) => [a.sha256, a])) : null;
+
+await page.goto(URL0);
+console.log(engine, browser.version(), "set", SETINFO.dir);
+await page.waitForFunction(() => document.querySelectorAll("#species option").length === 75 && !!document.querySelector("#pw iframe"), null, { timeout: 30000 });
 const n = await page.locator(".trk").count();
-ok("track list renders", n > 50, `${n} tracks, ${await page.locator(".list details").count()} sections`);
+ok("track list renders: 75 species rows and the engine tests", n === 75 + D0.tracks.length, `${n} rows, ${await page.locator(".list details").count()} sections`);
 const sw = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
 ok("no horizontal scroll", sw[0] <= sw[1], `scrollWidth ${sw[0]} / ${sw[1]}`);
 ok("background audio checks in the global list", (await page.locator("[data-g^=bg]").count()) === 3);
 ok("title", (await page.title()) === "Beast Sound Check", await page.title());
 ok("one iframe loaded", (await page.locator("iframe").count()) === 1);
+const start = await page.evaluate(() => ({ hash: location.hash, ttl: document.getElementById("ttl").textContent, kick: document.getElementById("kick").textContent, pos: document.getElementById("pos").textContent }));
+ok("starts on the Genesis Warlock of the newest set", start.hash === "#beast-01-genesis" && /^Warlock · Genesis$/.test(start.ttl) && start.kick.includes(SETINFO.dir) && start.pos === `1 / ${SETINFO.tokens + D0.tracks.length}`, JSON.stringify(start));
+ok("the set selector shows only when there is more than one set", (await page.isHidden("#setrow")) === (D0.sepolia.sets.length < 2), `${D0.sepolia.sets.length} set(s)`);
 const t0 = await page.locator("#ttl").textContent();
 await page.click("#next");
 const t1 = await page.locator("#ttl").textContent();
 ok("next changes track", t1 !== t0 && (await page.locator("#pos").textContent()).startsWith("2 /"), `${t0} -> ${t1}`);
+await page.waitForSelector("#pw iframe", { timeout: 20000 }); // a real Beast mounts once its token_uri is rebuilt and checked
 ok("still one iframe after next", (await page.locator("iframe").count()) === 1);
 await page.click("#prev");
 ok("prev returns", (await page.locator("#ttl").textContent()) === t0);
@@ -59,10 +116,168 @@ const exp = await page.evaluate(() => document.getElementById("exporttext").valu
 ok("export produces a summary", /Pass 1, fail 1/.test(exp) || /Results copied/.test(exp), exp.slice(0, 80).replace(/\n/g, " "));
 const stored = await page.evaluate((k) => { try { return localStorage.getItem(k); } catch (e) { return "blocked"; } }, await page.evaluate(() => "beast-sound-check-" + JSON.parse(document.getElementById("data").textContent).meta.playerVersion + "-v1"));
 ok("localStorage written (or cleanly blocked)", stored === "blocked" || /smoke note/.test(stored || ""), stored === "blocked" ? "blocked" : "saved");
+await page.click("#bp"); await page.fill("#note", ""); await page.click("#next"); await page.click("#bf"); await page.click("#prev"); // clear them again
 
-// one track per section: load, play, stop
+// ---- section 1: real Beasts
+const frameOf = async () => (await page.locator("#pw iframe").elementHandle()).contentFrame();
+const srcdoc = () => page.evaluate(() => (document.querySelector("#pw iframe") || {}).srcdoc || null);
+async function pick(sid, v) {
+  await page.selectOption("#species", String(sid));
+  await page.click(`[data-var=${v}]`);
+  const tok = tokOf(sid, v);
+  await page.waitForFunction((name) => { const f = document.querySelector("#pw iframe"); return f && f.title === "Player: " + name && f.srcdoc.length > 1000; }, tok.name, { timeout: 20000 });
+  return tok;
+}
+async function playFor(f, seconds = 0.5) {
+  await f.waitForSelector("#play:not([disabled])", { timeout: 20000 });
+  await f.click("#play");
+  await f.waitForFunction((s) => window.__ac && window.__ac.state === "running" && window.__ac.currentTime > s, seconds, { timeout: 15000 });
+}
+// screenshots of the Beast's box in the card (as stepTest below): how many times the art changes in `ms`
+async function artChanges(ms, every = 150) {
+  const box = await page.locator("#pw iframe").boundingBox();
+  const sc = Math.min(box.width / 250, box.height / 350), ox = box.x + (box.width - 250 * sc) / 2, oy = box.y + (box.height - 350 * sc) / 2;
+  const clip = { x: ox + 62 * sc, y: oy + 66 * sc, width: 126 * sc, height: 126 * sc };
+  const shots = [], t = Date.now();
+  while (Date.now() - t < ms) { shots.push(decodePng(await page.screenshot({ clip }))); await page.waitForTimeout(every); }
+  let changes = 0; for (let i = 1; i < shots.length; i++) if (diffPx(shots[i - 1], shots[i]) > 40) changes++;
+  return { changes, shots: shots.length };
+}
+{
+  await page.locator("#sepolia").scrollIntoViewIfNeeded();
+  const gifs = {};
+  for (const [sid, v] of [[1, "genesis"], [1, "p0"], [1, "p1"], [1, "p2"], [1, "p3"], [75, "p0"], [75, "p3"]]) {
+    const tok = await pick(sid, v);
+    const want = animationPage(await set.tokenUri(tok.tokenId)), got = await srcdoc();
+    const same = Buffer.from(got, "utf8").equals(want);
+    await page.locator("#pw").scrollIntoViewIfNeeded();
+    const f = await frameOf();
+    const dom = await f.evaluate(() => ({ art: (document.getElementById("beast-art") || {}).localName, trusted: document.body.hasAttribute("data-trusted-art"), notes: document.querySelectorAll("script#beast-notes").length }));
+    const gif = gifOf(got); gifs[`${sid}${v}`] = gif;
+    const canon = genesisGif ? genesisGif.get(gif) : null;
+    const artOk = !genesisGif || (!!canon && canon.speciesId === sid && canon.provider === (tok.shiny ? "shiny-gif" : "regular-gif"));
+    const wantNotes = v === "genesis" || v === "p2" || v === "p3";
+    const facts = await page.textContent("#facts");
+    const factsOk = facts.includes(tok.tokenId) && facts.includes(String(set.manifest.blockNumber)) && facts.includes(tok.tempo.bpm + " BPM") && facts.includes(tok.name);
+    let play = "";
+    try { await playFor(f); play = "playing " + (await f.evaluate(() => window.__ac.currentTime.toFixed(2))) + " s"; await f.click("#play"); } catch (e) { play = "NOT playing: " + String(e).split("\n")[0]; }
+    ok(`real Beast ${sid} ${v}: ${tok.name}`, same && dom.art === "img" && !dom.trusted && (dom.notes === 1) === wantNotes && tok.notes === wantNotes && artOk && factsOk && play.startsWith("playing"),
+      `byte-identical ${same} (${want.length} B), art <${dom.art}> trusted ${dom.trusted}, notes ${dom.notes} (want ${wantNotes ? 1 : 0}), ${tok.shiny ? "shiny" : "regular"} GIF ${gif && gif.slice(0, 8)}${canon ? " = " + canon.source : ""}, facts ${factsOk}, ${play}`);
+  }
+  // shiny and regular: the shiny variants (Genesis, 1, 3) carry one GIF, the regular ones (0, 2) another
+  ok("shiny vs regular art", gifs["1genesis"] === gifs["1p1"] && gifs["1p1"] === gifs["1p3"] && gifs["1p0"] === gifs["1p2"] && gifs["1p0"] !== gifs["1p1"] && gifs["75p0"] !== gifs["75p3"] && gifs["75p0"] !== gifs["1p0"], genesisGif ? "and each is the species' canonical genesis GIF" : "(set BEASTS3 to check the canonical files too)");
+}
+
+// ---- the page footer selector, on a preset 0 Beast (no notes or rainbow behind the art)
+{
+  const tok = await pick(1, "p0");
+  const deployedHtml = animationPage(await set.tokenUri(tok.tokenId)).toString("utf8");
+  const dep = FT.deployed.text;
+  ok("the deployed footer ends the page exactly once", deployedHtml.endsWith(dep) && deployedHtml.indexOf(dep) === deployedHtml.lastIndexOf(dep), `${FT.deployed.title}, ${dep.length} B`);
+  await page.locator("#pw").scrollIntoViewIfNeeded();
+  const pauseRun = async () => {
+    const f = await frameOf();
+    await playFor(f, 1);
+    await page.waitForTimeout(600);
+    const playing = await artChanges(1200);
+    await f.click("#play");
+    await f.waitForFunction(() => window.__ac.state !== "running", null, { timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(400);
+    const paused = await artChanges(2000);
+    await f.click("#play");
+    await f.waitForFunction(() => window.__ac.state === "running", null, { timeout: 5000 });
+    await page.waitForTimeout(300);
+    const resumed = await artChanges(1500);
+    const label = await f.getAttribute("#play", "aria-label");
+    await f.click("#play");
+    return { playing: playing.changes, paused: paused.changes, pausedShots: paused.shots, resumed: resumed.changes, label };
+  };
+  const asDeployed = await pauseRun();
+  const banner0 = await page.isHidden("#ftbadge");
+  ok("as deployed: the page is the rebuilt animation_url, no banner, the GIF keeps moving while paused", (await srcdoc()) === deployedHtml && banner0 && asDeployed.playing > 0 && asDeployed.paused > 0 && asDeployed.resumed > 0,
+    `art changes: playing ${asDeployed.playing}, paused ${asDeployed.paused} in 2 s (${asDeployed.pausedShots} shots), resumed ${asDeployed.resumed}`);
+  await page.selectOption("#ftsel", "pr88");
+  await page.waitForFunction(() => { const f = document.querySelector("#pw iframe"); return f && f.srcdoc.length > 1000; });
+  const pr = await srcdoc();
+  const banner = await page.evaluate(() => !document.getElementById("ftbadge").hidden && document.getElementById("ftbadge").textContent);
+  ok("Pause-freeze PR footer: spliced in place of the deployed footer, banner shows", pr === deployedHtml.slice(0, -dep.length) + FT.pr88.text && /not the deployed page/.test(banner || "") && banner.includes(FT.pr88.commit.slice(0, 7)), banner);
+  const freeze = await pauseRun();
+  ok("Pause-freeze PR footer: the art freezes on pause (no change in 2 s) and animates after resume", freeze.playing > 0 && freeze.paused === 0 && freeze.resumed > 0 && freeze.label === "Pause",
+    `art changes: playing ${freeze.playing}, paused ${freeze.paused} in 2 s (${freeze.pausedShots} shots), resumed ${freeze.resumed}`);
+  const checks = await page.textContent("#checks");
+  ok("the pause check follows the footer", /holds still/.test(checks), checks.slice(checks.indexOf("Pause"), checks.indexOf("Pause") + 80));
+  if (process.env.SHOTS) {
+    fs.mkdirSync(process.env.SHOTS, { recursive: true });
+    for (const scheme of ["light", "dark"]) {
+      await page.emulateMedia({ colorScheme: scheme }); await page.waitForTimeout(200);
+      await page.locator("#cur").evaluate((e) => window.scrollTo(0, e.getBoundingClientRect().top + window.scrollY - 8));
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: path.join(process.env.SHOTS, `${engine}-footer-banner-${scheme}.png`) });
+    }
+    await page.emulateMedia({ colorScheme: "light" });
+  }
+  const sw3 = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+  ok("no horizontal scroll with a real Beast and the footer banner", sw3[0] <= sw3[1], `scrollWidth ${sw3[0]} / ${sw3[1]}`);
+  // the rating records the set, block, token, name, preset and footer
+  await page.click("#bp"); await page.fill("#note", "pr88 note"); await page.locator("#note").blur();
+  await page.evaluate(() => { try { if (navigator.clipboard) navigator.clipboard.writeText = (t) => { window.__clip = t; return Promise.resolve(); }; } catch (e) {} window.__clip = ""; });
+  await page.click("#export"); await page.waitForTimeout(200);
+  const ex = await page.evaluate(() => window.__clip || document.getElementById("exporttext").value);
+  const line = ex.split("\n").find((x) => x.startsWith("PASS " + SETINFO.dir)) || "";
+  ok("export records set, block, token ID, name, preset and footer with its commit", line === `PASS ${SETINFO.dir} block ${set.manifest.blockNumber} token ${tok.tokenId} ${tok.name}, preset 0 (visual 0, sound 0) [footer: ${FT.pr88.label}, onchain-midi-player ${FT.pr88.commit.slice(0, 7)}] - pr88 note`
+    && /^Beasts on Sepolia \(real Beasts\)$/m.test(ex) && /^Engine tests \(onchain-midi-player's reference Beast page\)$/m.test(ex) && new RegExp(`^Pass 1, fail 0, untested ${SETINFO.tokens - 1} of ${SETINFO.tokens}$`, "m").test(ex), line);
+  // persistence: the footer, the Beast shown and its rating survive a reload
+  await page.reload(); await page.waitForFunction(() => { const f = document.querySelector("#pw iframe"); return f && f.srcdoc.length > 1000 && document.querySelectorAll("#species option").length === 75; }, null, { timeout: 30000 });
+  const kept = await page.evaluate(() => ({ ft: document.getElementById("ftsel").value, ttl: document.getElementById("ttl").textContent, bp: document.getElementById("bp").getAttribute("aria-pressed"), note: document.getElementById("note").value, banner: !document.getElementById("ftbadge").hidden }));
+  ok("real Beast, footer and rating persist across a reload", kept.ft === "pr88" && kept.ttl.startsWith(tok.name) && kept.bp === "true" && kept.note === "pr88 note" && kept.banner && (await srcdoc()).endsWith(FT.pr88.text), JSON.stringify(kept));
+  await page.click("#bp"); await page.fill("#note", ""); await page.locator("#note").blur();
+  await page.selectOption("#ftsel", "main");
+  await page.waitForFunction(() => { const f = document.querySelector("#pw iframe"); return f && f.srcdoc.length > 1000; });
+  const before = errors.length, mainHtml = await srcdoc();
+  let mainPlay = "";
+  try { await page.locator("#pw").scrollIntoViewIfNeeded(); const f = await frameOf(); await playFor(f); mainPlay = "playing"; await f.click("#play"); } catch (e) { mainPlay = String(e).split("\n")[0]; }
+  ok("upstream main footer: spliced, plays on the 0.7.0 page without errors", mainHtml === deployedHtml.slice(0, -dep.length) + FT.main.text && mainPlay === "playing" && errors.length === before, `${mainPlay}${errors.length > before ? ", " + errors.slice(before).join(" | ") : ""}`);
+  await page.selectOption("#ftsel", "");
+  await page.waitForFunction(() => { const f = document.querySelector("#pw iframe"); return f && f.srcdoc.length > 1000; });
+  ok("back to as deployed: byte-identical again, banner gone", (await srcdoc()) === deployedHtml && (await page.isHidden("#ftbadge")));
+  if (process.env.SHOTS) {
+    await pick(1, "p3");
+    for (const scheme of ["light", "dark"]) {
+      await page.emulateMedia({ colorScheme: scheme }); await page.waitForTimeout(200);
+      await page.locator("#sepolia").evaluate((e) => window.scrollTo(0, e.getBoundingClientRect().top + window.scrollY - 8));
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: path.join(process.env.SHOTS, `${engine}-picker-${scheme}.png`) });
+    }
+    await page.emulateMedia({ colorScheme: "light" });
+  }
+}
+
+// ---- a SHA-256 mismatch refuses to play, and a page without crypto.subtle says why
+{
+  const bad = tokOf(1, "p1");
+  const p2 = await ctx.newPage();
+  await p2.route("**/renditions/*/manifest.json", async (route) => {
+    const r = await route.fetch(), m = await r.json();
+    m.tokens.find((t) => t.tokenId === bad.tokenId).sha256 = "0".repeat(64);
+    await route.fulfill({ response: r, body: JSON.stringify(m) });
+  });
+  await p2.goto(URL0 + "#beast-01-p1");
+  await p2.waitForSelector("#pw .pwmsg.bad", { timeout: 30000 });
+  const r = await p2.evaluate(() => ({ msg: document.querySelector("#pw .pwmsg.bad").textContent, frames: document.querySelectorAll("#pw iframe").length, ttl: document.getElementById("ttl").textContent }));
+  ok("a SHA-256 mismatch shows an error and does not play", /SHA-256 check failed/.test(r.msg) && r.frames === 0 && r.ttl.startsWith(bad.name), r.msg.slice(0, 140));
+  await p2.close();
+  const c3 = await newCtx(); await c3.addInitScript(() => { try { Object.defineProperty(window.crypto, "subtle", { get: () => undefined }); } catch (e) {} });
+  const p3 = await c3.newPage();
+  await p3.goto(URL0); await p3.waitForSelector("#seperr:not([hidden])", { timeout: 20000 });
+  await p3.waitForSelector("#pw iframe", { timeout: 20000 });
+  const r3 = await p3.evaluate(() => ({ err: document.getElementById("seperr").textContent, kick: document.getElementById("kick").textContent, sel: document.getElementById("species").disabled }));
+  ok("without crypto.subtle: a clear message, real Beasts off, the engine tests still load", /secure context/.test(r3.err) && /localhost/.test(r3.err) && r3.sel && r3.kick.startsWith("Engine test"), r3.err.slice(0, 120));
+  await c3.close();
+}
+
+// ---- engine tests: one track per section (the first and the middle one): load, play, stop
 const per = Number(process.argv[2] || 1);
-const sections = await page.evaluate(() => Array.from(document.querySelectorAll(".list details")).map((d) => Array.from(d.querySelectorAll(".trk")).map((b) => b.querySelector(".id").textContent)));
+const sections = await page.evaluate(() => Array.from(document.querySelectorAll(".list details")).slice(1).map((d) => Array.from(d.querySelectorAll(".trk")).map((b) => b.querySelector(".id").textContent)));
 for (const ids of sections) {
   const picks = ids.slice(0, per);
   if (ids.length > per && per === 1) picks.push(ids[Math.floor(ids.length / 2)]);
@@ -120,18 +335,6 @@ for (const ids of sections) {
 }
 
 // ---- art toggle and sprite stepping (SMIL inside SVG-as-image)
-import zlib from "node:zlib";
-function decodePng(buf) {
-  let p = 8, w = 0, h = 0, ct = 0; const idat = [];
-  while (p < buf.length) { const len = buf.readUInt32BE(p), type = buf.toString("latin1", p + 4, p + 8); const d = buf.subarray(p + 8, p + 8 + len);
-    if (type === "IHDR") { w = d.readUInt32BE(0); h = d.readUInt32BE(4); ct = d[9]; } else if (type === "IDAT") idat.push(d); p += 12 + len; }
-  const bpp = ct === 6 ? 4 : 3, raw = zlib.inflateSync(Buffer.concat(idat)), out = Buffer.alloc(w * h * bpp), stride = w * bpp;
-  for (let y = 0; y < h; y++) { const f = raw[y * (stride + 1)]; for (let x = 0; x < stride; x++) {
-    const v = raw[y * (stride + 1) + 1 + x], a = x >= bpp ? out[y * stride + x - bpp] : 0, b = y ? out[(y - 1) * stride + x] : 0, c = x >= bpp && y ? out[(y - 1) * stride + x - bpp] : 0;
-    out[y * stride + x] = (f === 0 ? v : f === 1 ? v + a : f === 2 ? v + b : f === 3 ? v + ((a + b) >> 1) : v + (() => { const pp = a + b - c, pa = Math.abs(pp - a), pb = Math.abs(pp - b), pc = Math.abs(pp - c); return pa <= pb && pa <= pc ? a : pb <= pc ? b : c; })()) & 255; } }
-  return { w, h, bpp, data: out };
-}
-const diffPx = (a, b) => { let n = 0; for (let i = 0; i < a.data.length; i += a.bpp) if (Math.abs(a.data[i] - b.data[i]) + Math.abs(a.data[i + 1] - b.data[i + 1]) + Math.abs(a.data[i + 2] - b.data[i + 2]) > 60) n++; return n; };
 async function stepTest(titlePrefix, wantFrames, play) {
   await page.evaluate((t) => { const b = Array.from(document.querySelectorAll(".trk")).find((x) => x.querySelector(".t").textContent.startsWith(t)); b.closest("details").open = true; b.click(); }, titlePrefix);
   await page.waitForTimeout(300);
@@ -151,6 +354,9 @@ async function stepTest(titlePrefix, wantFrames, play) {
 }
 const artHtml = async () => { const f = await (await page.locator("iframe").elementHandle()).contentFrame(); await f.waitForSelector("#play:not([disabled])"); return f.evaluate(() => { const a = document.getElementById("beast-art"); return a.localName + "|" + a.outerHTML; }); };
 const has = (h) => [h.includes("data:image/png"), h.includes("data:image/gif")];
+// the engine tests' art: inline SVG on the reference page, Synced by default (an animated track at 120 BPM)
+await page.evaluate(() => { const b = Array.from(document.querySelectorAll(".trk")).find((x) => x.querySelector(".id").textContent === "2.03"); b.closest("details").open = true; b.click(); });
+await page.waitForTimeout(300);
 const a0 = await artHtml();
 ok("trusted art is inline SVG", a0.startsWith("svg|"), a0.slice(0, 4));
 const syncedHas = has(a0);
@@ -171,7 +377,7 @@ await page.uncheck("#cardSync");
 
 // ---- pause keeps the position, resume carries on, the inline art follows the music
 {
-  await page.evaluate(() => { const b = Array.from(document.querySelectorAll(".trk")).find((x) => x.querySelector(".id").textContent === "1.03"); b.closest("details").open = true; b.click(); });
+  await page.evaluate(() => { const b = Array.from(document.querySelectorAll(".trk")).find((x) => x.querySelector(".id").textContent === "2.03"); b.closest("details").open = true; b.click(); });
   await page.waitForTimeout(300); await page.locator("#pw").scrollIntoViewIfNeeded();
   const f = await (await page.locator("iframe").elementHandle()).contentFrame();
   await f.waitForSelector("#play:not([disabled])");
@@ -230,7 +436,7 @@ await page.uncheck("#cardSync");
 
 // ---- animation speed: the Synced sprite's dur per note value, nothing else in the art changes, shipped by default
 {
-  const D = JSON.parse(/<script type="application\/json" id="data">([\s\S]*?)<\/script>/.exec(fs.readFileSync(path.join(here, SITE), "utf8"))[1]);
+  const D = D0;
   const Q = { ultraslow: 4, slow: 2, medium: 1, fast: 0.5, ultrafast: 0.25 }; // quarter notes per frame
   const sec = (us) => (us / 1e6).toFixed(6).replace(/0+$/, "").replace(/\.$/, ""); // art.mjs
   const shipped = (a) => (a.tempoUs / 2 < 200000 ? "medium" : "fast"); // art.mjs frameUs: the eighth, or the quarter when the eighth is under 0.2 s
@@ -299,7 +505,7 @@ await page.uncheck("#cardSync");
   await page.click("#bp");
   await page.reload(); await page.waitForTimeout(300);
   ok("speed setting persists", (await pressed()) === "slow", await pressed());
-  await page.goto("file://" + path.join(here, SITE) + "?speed=ultrafast#203"); await page.waitForTimeout(300);
+  await page.goto(ORIGIN + SITE + "?speed=ultrafast#203"); await page.waitForTimeout(300);
   const u = (SPRITE.exec(svgOf(await srcdoc())) || [])[1];
   ok("?speed= selects a step", (await pressed()) === "ultrafast" && u === want(byLabel("2.03").art, "ultrafast"), `${await pressed()} ${u}s`);
   await page.click("#speedship");
@@ -311,6 +517,7 @@ await page.uncheck("#cardSync");
 ok("no console errors", errors.length === 0, errors.slice(0, 3).join(" | "));
 ok("no network requests", requests.length === 0, requests.slice(0, 3).join(" | "));
 await browser.close();
+server.close();
 const bad = results.filter((r) => !r.pass);
 console.log(`${engine}: ${results.length - bad.length}/${results.length} checks passed`);
 process.exit(bad.length ? 1 : 0);

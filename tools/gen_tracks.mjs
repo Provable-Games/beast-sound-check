@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-// Stage 1 of the listening-test site: builds tracks.json (one real animation_url page per track).
+// Stage 1 of the listening-test site: builds tracks.json, the engine tests (one real animation_url page per track:
+// TinyChip presets, drums, edge cases, stress ramps and the client chip bank). The real Beasts, section 1 of the
+// page, are not built here: the page reads them from a Sepolia rendition set (renditions/, tools/rendition_set.mjs).
 //
 //   OMP=<onchain-midi-player checkout> BEAST=<midi_fun_contract checkout> BEASTS3=<beasts-v3 checkout> node gen_tracks.mjs
 //
@@ -15,11 +17,6 @@
 // art sync, background audio, media session). Each page is round-tripped through the spliced token_uri
 // and decodeTokenUri, and the token_uri passes scripts/validate_token_uri.mjs, so the bytes are what a
 // 0.7.0 Beast's animation_url would carry.
-//
-// Beast MIDI path (same as scripts/tinysynth_e2e/fixtures.mjs, which provider.cairo documents as
-// byte-identical to Cairo's v11_score_full_smf_bytes): createEngineV11(engine).render(beast, live,
-// {keys:'mode', even:true, traj:true}) -> beastSoundMidi(result, engine.formLength). Settings:
-// beastSynthSettings(undefined, beastPrograms(beast_type, shiny)).
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,17 +34,12 @@ const { ALIGN } = await imp(OMP + "/examples/beast_consumer/scripts/reference.mj
 const { validateTokenUri } = await imp(OMP + "/scripts/validate_token_uri.mjs");
 const SF = await imp(OMP + "/scripts/settings_fixtures.mjs");
 const RW = await imp(OMP + "/scripts/reference_waves.mjs");
-const { engine: E } = await imp(BS + "/src/index.js");
-const FM = await imp(BS + "/src/full_midi.js");
-const { createEngineV11 } = await imp(BS + "/src/engine_v11.js");
 const SS = await imp(BS + "/onchain/tinychip/synth_settings.mjs");
 const ES = await imp(BS + "/onchain/tinychip/essentials.mjs");
 
 import * as ART from "./art.mjs";
 const { TABLES } = await imp(BS + "/src/index.js");
 const { genesisTier, genesisType } = await imp(BS + "/src/engine.js");
-const v11 = createEngineV11(E);
-const V11 = { keys: "mode", even: true, traj: true };
 const bank = ES.loadBank();
 const DATA = ES.bankData(bank);
 const ESSENTIALS = ES.ESSENTIALS;
@@ -223,86 +215,23 @@ function splitPage(html, art, d, title) {
   return { art, ws };
 }
 
-const SEC = { beast: "1 Beast compositions", preset: "2 TinyChip presets", drum: "3 Drums", edge: "4 General range and edge cases", bank: "5 Client chip bank (not onchain)" };
+const SEC = { preset: "2 TinyChip presets", drum: "3 Drums", edge: "4 General range and edge cases", bank: "5 Client chip bank (not onchain)" };
 
 // =============================================================================================
-// 1. Beast compositions
+// Section 1 is the real Beasts (Beasts on Sepolia), which the page reads from renditions/ at run time; it has no
+// tracks here. Casey's compositions on the reference page, which used to be section 1, were removed, but the species
+// they reserved stay reserved, so the engine tests below keep their art (the art queue deals the rest in order):
+// the e2e Warlock and heaviest (1 and 53), and for each former composition slot [family, mega, tier, sections] the
+// first genesis species of that family and tier (or of that family when no species has the tier).
 // =============================================================================================
-const FILL_TEXT = { A: "tier 5: two snare hits on the last beat of a section", B: "tier 4: a four-note sixteenth snare run into each section", C: "tier 3: a two-beat build (kick + snare roll) into each section", D: "tiers 1-2: a tom roll down into a cymbal on the next downbeat" };
-const TYPE = ["Magic", "Hunter", "Brute"];
-// program / pan of every channel track, read back from the finished MIDI
-function midiChannels(m) {
-  const out = []; let p = 14;
-  while (p < m.length) {
-    const len = (m[p + 4] << 24) | (m[p + 5] << 16) | (m[p + 6] << 8) | m[p + 7]; const d = p + 8;
-    if (m[d] === 0 && (m[d + 1] & 0xf0) === 0xc0) out.push({ ch: m[d + 1] & 15, program: m[d + 2], pan: m[d + 6] });
-    p = d + len;
-  }
-  return out;
-}
-const beastSummary = [];
-function beastTrack({ beast, live, label, note, strings }) {
-  const res = v11.render(beast, live, V11);
-  const midi = FM.beastSoundMidi(res, E.formLength);
-  const p = res.params, mega = beast.shiny === 1;
-  const settings = SS.beastSynthSettings(undefined, SS.beastPrograms(beast.beast_type, mega));
-  const bpm = 60e6 / p.tempo_us, ticks = E.formLength(res.form), sec = (ticks / 480) * (p.tempo_us / 1e6);
-  const secTicks = res.form.section_ticks;
-  const starts = Array.from({ length: p.section_count }, (_, i) => fmtT(((i * secTicks) / 480) * (p.tempo_us / 1e6)));
-  const flags = beast.shiny && beast.animated ? "shiny + animated (131.87)" : "animated (127.66)";
-  const chans = midiChannels(midi).filter((c) => c.ch !== 9);
-  const orch = chans.map((c) => `ch${c.ch + 1} ${pname(c.program)} (${c.program}, pan ${c.pan})`).join("; ");
-  const fill = FM.fillFor(beast.tier);
-  const title = `${label}: ${bpm.toFixed(2)} BPM, ${p.section_count} section${p.section_count > 1 ? "s" : ""}`;
-  const checks = [
-    `Tempo ${bpm.toFixed(2)} BPM, flag ${flags}: a little quicker than a plain 120 Beast.`,
-    `${p.section_count} section${p.section_count > 1 ? "s" : ""}, ${p.voice_count} voice${p.voice_count > 1 ? "s" : ""}, one pass ${sec.toFixed(1)} s (${fmtT(sec)})${p.section_count > 1 ? `; sections start at ${starts.join(", ")} and the key moves at each` : ""}.`,
-    `Instruments, ${TYPE[beast.beast_type]} family: ${orch}.${mega ? " Mega: the lead plays Robot Hero Lead or N163 Brass Wave with an octave double of the other on its own channel, panned opposite." : ""}`,
-    `Chip character: leads are stepped, 4-bit-looking chip waves (not smooth sine), plucks decay quickly, panning spreads voices left to right. Casey's 054984d level-balances the plucks to one attack level (cut 2 to 8 dB), so no pluck should jump out over the leads.`,
-    `Drums on channel 10: kick, half-time snare, eighth hats${mega ? " (mega: sixteenth hats, extra kick on the and of 2, crash on every section downbeat)" : ""}; fill ${fill}, ${FILL_TEXT[fill]}.`,
-    `Loop at ${fmtT(sec)}: no gap and no click, and the theme comes back in its home key.`,
-  ];
-  if (note) checks.push(note);
-  add({
-    section: "1 Beast compositions", title, checks, midi, settings, beast, strings,
-    blurb: `${TYPE[beast.beast_type]} tier ${beast.tier}, ${midi.length}-byte MIDI, ${settings.timbres.length} timbres in SETTINGS.`,
-  });
-  return { bpm, sections: p.section_count, sec, midiLen: midi.length, species: beast.id, shiny: !!beast.shiny, tier: beast.tier, type: beast.beast_type };
-}
-// Slots: [family, mega (shiny + animated: 131.87 BPM), tier, sections]; every Beast is animated (127.66 BPM
-// otherwise). Species are genesis species of that family and tier, composed from synthetic traits and a
-// synthetic defeat count (sections follow the defeat count in composer v1.1: 0 -> 1, 1 -> 2, 3 -> 3, 20 -> 4, 63 -> 5).
-const SCARS_FOR = { 1: 0, 2: 1, 3: 3, 4: 20, 5: 63 };
 const SLOTS = [
   [0, 0, 5, 1], [1, 0, 4, 1], [2, 0, 3, 2], [0, 0, 2, 3], [1, 0, 1, 4], [2, 0, 2, 5], [1, 0, 3, 2],
   [0, 1, 4, 1], [1, 1, 5, 2], [2, 1, 1, 3], [0, 1, 3, 4], [1, 1, 2, 5], [2, 1, 4, 2], [0, 1, 2, 3],
 ];
-const section1Species = [];
-for (const [type, mega, tier] of SLOTS) {
+for (const [type, , tier] of SLOTS) {
   let id = 1; while (id <= 75 && (reserved.has(id) || sp(id).type !== type || sp(id).tier !== tier)) id++;
   if (id > 75) { id = 1; while (reserved.has(id) || sp(id).type !== type) id++; }
-  reserved.add(id); section1Species.push(id);
-}
-SLOTS.forEach(([type, mega, tier, want], i) => {
-  const id = section1Species[i], t = sp(id);
-  const beast = { id, prefix: 1 + ((id * 7) % 69), suffix: 1 + ((id * 11) % 18), level: 25 + ((id * 3) % 60), health: 100 + ((id * 13) % 400), shiny: mega, animated: 1, tier: t.tier, beast_type: t.type, rank: 100 + id * 7 };
-  const live = { adventurers_killed: 0, scars: SCARS_FOR[want], summit_held_seconds: 0, rank: beast.rank, species_count: 1200 };
-  const strings = { name: t.name, prefix: TABLES.prefixes[beast.prefix - 1], suffix: TABLES.suffixes[beast.suffix - 1], type: TYPE_NAMES[t.type] };
-  beastSummary.push(beastTrack({ beast, live, strings, label: `${t.name}${mega ? " (mega)" : ""}`, note: `Synthetic traits and defeat count (${SCARS_FOR[want]}) to reach ${want} section${want > 1 ? "s" : ""}${t.tier !== tier ? `; no species of this family has tier ${tier}, so tier ${t.tier}` : ""}.` }));
-});
-{
-  // Casey's e2e cases, on their own species: the heaviest is species 53 (animated, shiny); the calm Warlock
-  // is species 1, shown animated (its plain MIDI, 1,501 bytes, is checked below).
-  const heavy = [{ id: 53, prefix: 69, suffix: 18, level: 255, health: 1023, shiny: 1, animated: 1, tier: 1, beast_type: 2 }, { adventurers_killed: 500, scars: 63, summit_held_seconds: 0, rank: 1, species_count: 1243 }];
-  const r = beastTrack({ beast: { ...heavy[0], rank: 1 }, live: heavy[1], strings: { name: TABLES.species[52], prefix: TABLES.prefixes[68], suffix: TABLES.suffixes[17], type: "Brute" }, label: "Casey e2e heaviest (mega Brute)", note: "Casey's e2e 'heaviest' case (rank 1: crown on the card): its MIDI must be exactly 10,182 bytes." });
-  beastSummary.push(r);
-  if (r.midiLen !== 10182) warn.push(`heaviest MIDI is ${r.midiLen} bytes, e2e README says 10182`);
-  const W = { id: 1, prefix: 57, suffix: 15, level: 126, health: 229, shiny: 0, animated: 0, tier: 1, beast_type: 0 };
-  const calm = { adventurers_killed: 0, scars: 0, summit_held_seconds: 0, rank: 500, species_count: 954 };
-  const plain = FM.beastSoundMidi(v11.render(W, calm, V11), E.formLength);
-  if (plain.length !== 1501) warn.push(`plain Warlock MIDI is ${plain.length} bytes, e2e README says 1501`);
-  const r2 = beastTrack({ beast: { ...W, animated: 1, rank: 500 }, live: calm, strings: { name: "Warlock", prefix: TABLES.prefixes[56], suffix: TABLES.suffixes[14], type: "Magic" }, label: "Casey e2e Warlock (calm, animated variant)", note: "Casey's calm Warlock case is not animated (its plain MIDI, 1,501 bytes, is checked at build time); this is its animated variant (127.66 BPM)." });
-  beastSummary.push(r2);
+  reserved.add(id);
 }
 
 // ---- the species queue for the other tracks: remaining species in order, alternating regular and shiny
@@ -955,7 +884,7 @@ const meta = {
   generated: new Date().toISOString(), playerVersion: SEG.VERSION, fixedBytes: Object.values(FIXED).reduce((n, f) => n + f.length, 0),
   beastCommit: need("BEAST_LABEL"), ompCommit: need("OMP_LABEL"),
   bankFail, warn,
-  beast: beastSummary, usedArt, playAnchor,
+  usedArt, playAnchor,
 };
 fs.writeFileSync(path.join(here, "tracks.json"), JSON.stringify({ meta, fixed: FIXED, tracks }));
 const counts = {};
