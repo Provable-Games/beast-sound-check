@@ -12,6 +12,69 @@ const json = JSON.stringify(data).replace(/</g, "\\u003c").replace(new RegExp("\
 
 const V = data.meta.playerVersion;
 const BANNER = "";
+// Engine test (opt-in, off by default): injected into the NFT page's head ahead of the engine. It sets the
+// AudioContext latency hint and the sequencer lookahead (preroll) for an A/B on a phone, and paints a meter:
+// Chrome's AudioRenderCapacity load and underruns where available, the longest main-thread stall, and the
+// lookahead in effect. M: { label, hint: true ("playback") | false (default) | null (as shipped), preroll: s | null }.
+function engineTest(M) {
+  "use strict";
+  var W = window, R = W.AudioContext || W.webkitAudioContext, box = null;
+  if (!R) return;
+  var st = { ctx: null, pre: null, cap: "waiting for audio", avg: null, peak: 0, now: null, under: 0, first: null, stall: 0, firstStall: null };
+  function A(o) {
+    var c = M.hint === null ? (o === undefined ? new R() : new R(o)) : M.hint ? new R({ latencyHint: "playback" }) : new R();
+    if (!st.ctx) { st.ctx = c; watch(c); }
+    return c;
+  }
+  A.prototype = R.prototype;
+  W.AudioContext = A;
+  if (W.webkitAudioContext) W.webkitAudioContext = A;
+  var real;
+  Object.defineProperty(W, "WebAudioTinySynth", { configurable: true, enumerable: true, set: function (v) { real = v; },
+    get: function () { return real && function (o) { var s = new real(o); if (M.preroll !== null) s.preroll = M.preroll; st.pre = s.preroll; paint(); return s; }; } });
+  function at() { return st.ctx ? st.ctx.currentTime : 0; }
+  function watch(c) {
+    var rc = c.renderCapacity;
+    if (rc && typeof rc.start === "function") {
+      st.cap = "on";
+      rc.addEventListener("update", function (e) {
+        st.avg = e.averageLoad; st.peak = Math.max(st.peak, e.peakLoad); st.now = e.underrunRatio;
+        if (e.underrunRatio > 0) { st.under++; if (st.first === null) st.first = at(); }
+        paint();
+      });
+      try { rc.start({ updateInterval: 1 }); } catch (e) { st.cap = "could not start"; }
+    } else st.cap = "not available in this browser";
+    var last = performance.now();
+    setInterval(function () {
+      var p = performance.now(), gap = p - last - 100; last = p;
+      if (c.state === "running") { if (gap > st.stall) st.stall = gap; if (gap > 150 && st.firstStall === null) st.firstStall = at(); }
+      paint();
+    }, 100);
+  }
+  function ms(x) { return typeof x === "number" ? (x * 1000).toFixed(1) + " ms" : "n/a"; }
+  function pct(x) { return typeof x === "number" ? Math.round(x * 100) + "%" : "n/a"; }
+  function paint() {
+    if (!document.body) return;
+    if (!box) {
+      box = document.createElement("div");
+      box.style.cssText = "position:fixed;left:4px;top:4px;z-index:2147483647;font:11px/1.35 monospace;color:#fff;background:rgba(0,0,0,.75);padding:4px 6px;border-radius:4px;pointer-events:none;white-space:pre";
+      document.body.appendChild(box);
+    }
+    var c = st.ctx;
+    box.textContent = [
+      "engine test: " + M.label,
+      c ? "audio clock " + c.currentTime.toFixed(1) + " s, " + c.state + ", " + c.sampleRate + " Hz" : "audio not started",
+      c ? "base latency " + ms(c.baseLatency) + ", output latency " + ms(c.outputLatency) : "",
+      "lookahead " + (st.pre === null ? "?" : st.pre + " s"),
+      "load: " + (st.cap === "on" ? "average " + pct(st.avg) + ", peak " + pct(st.peak) + ", underruns now " + pct(st.now) : st.cap),
+      st.cap === "on" ? "first underrun " + (st.first === null ? "none" : "at " + st.first.toFixed(1) + " s") + ", seconds with underruns " + st.under : "",
+      "longest main-thread stall " + Math.round(st.stall) + " ms" + (st.firstStall === null ? "" : ", first over 150 ms at " + st.firstStall.toFixed(1) + " s"),
+    ].filter(Boolean).join("\n");
+  }
+  document.addEventListener("DOMContentLoaded", paint);
+}
+const ENGINE_TEST = engineTest.toString();
+
 const BGBLOCK = `
   <div class="bgblock"><b>Background audio checks</b> (player ${V})</div>
   <label><input type="checkbox" data-g="bgandroid"><span><b>Android.</b> After play, the notification and Media Output show the Beast's frames side by side (a filmstrip), the whole Beast visible with no cropped face, with the track title. Pause and play work from the notification, and the lock screen controls work. Audio keeps playing with the screen locked.</span></label>
@@ -123,6 +186,15 @@ ${BANNER}
     <button id="aSync" aria-pressed="true">Art: Synced</button>
   </div>
   <label class="cardsync"><input type="checkbox" id="cardSync"><span>Card synced (rim 16 beats, pulse 4 beats, logo 8 beats; Synced art only)</span></label>
+  <label class="cardsync"><span>Engine test:</span> <select id="etest">
+    <option value="">Off (the page as shipped)</option>
+    <option value="meter">As shipped, with the load meter</option>
+    <option value="big1">Large buffer, 1 s lookahead (v2.1.0 on a phone)</option>
+    <option value="big02">Large buffer, 0.2 s lookahead</option>
+    <option value="def1">Default buffer, 1 s lookahead</option>
+    <option value="def02">Default buffer, 0.2 s lookahead (v2.0.1 on a phone)</option>
+  </select></label>
+  <p class="muted" id="etestinfo"></p>
   <p class="muted" id="artinfo"></p>
   <p class="hint">Tap the play button on the card. Only this track's player is loaded. Marketplaces show animation_url in a sandboxed frame like this one; <button id="alone" class="linkish">open this page on its own</button> to test it as a top-level page (background audio and lock-screen controls can differ).</p>
   <details class="lab" id="lab">
@@ -175,9 +247,14 @@ var D = JSON.parse(document.getElementById("data").textContent);
 var T = D.tracks, F = D.fixed, KEY = "beast-sound-check-${V}-v1";
 // the page as consumerPieces composed it: fixed fragments, this track's art and D, and its alignment whitespace
 function pageOf(t, v) { var p = t.pages[v], sp = function (n) { return new Array(9 * n + 1).join(" "); };
-  return F.head + labStyle() + sp(p.ws[0]) + F.gunzip + sp(p.ws[1]) + F.player + F.body + labArt(p.art) + t.d + sp(p.ws[2]) + (F.notes ? F.notes + sp(p.ws[3]) : "") + F.footer; }
+  return F.head + labStyle() + engineTest() + sp(p.ws[0]) + F.gunzip + sp(p.ws[1]) + F.player + F.body + labArt(p.art) + t.d + sp(p.ws[2]) + (F.notes ? F.notes + sp(p.ws[3]) : "") + F.footer; }
 function variant() { return store.art === "gif" ? 0 : store.card ? 2 : 1; }
-var store = { r: {}, g: {}, last: "", art: "synced", card: false, lab: null, v: 1 };
+var ENGINE_TEST = ${JSON.stringify(ENGINE_TEST)};
+var TESTS = { meter: { hint: null, preroll: null }, big1: { hint: true, preroll: 1 }, big02: { hint: true, preroll: 0.2 }, def1: { hint: false, preroll: 1 }, def02: { hint: false, preroll: 0.2 } };
+function engineTest() { var m = TESTS[store.test]; if (!m) return "";
+  var label = $("etest").options[$("etest").selectedIndex].text;
+  return "<script>(" + ENGINE_TEST + ")(" + JSON.stringify({ label: label, hint: m.hint, preroll: m.preroll }) + ");</scr" + "ipt>"; }
+var store = { r: {}, g: {}, last: "", art: "synced", card: false, lab: null, test: "", v: 1 };
 // The page's own button settings, as shipped (the head stylesheet's :root custom properties)
 var SHIP = (function () { var o = {}, ok = true; ["min", "max", "target"].forEach(function (k) {
   var m = new RegExp("--play-" + k + ":([0-9.]+)px").exec(F.head); if (m) o[k] = +m[1]; else ok = false; });
@@ -194,7 +271,7 @@ function labArt(art) {
 function labStyle() { if (!labOn()) return ""; var l = store.lab;
   return '<style id="sound-check-lab">:root{--play-min:' + l.min + 'px;--play-max:' + l.max + 'px;--play-target:' + l.target + "px}</style>"; }
 try { var raw = localStorage.getItem(KEY); if (raw) { var o = JSON.parse(raw); if (o && typeof o === "object") { store.r = o.r || {}; store.g = o.g || {}; store.last = o.last || ""; store.art = o.art === "gif" ? "gif" : "synced";
-  if (o.lab && typeof o.lab === "object" && [o.lab.min, o.lab.max, o.lab.target, o.lab.s].every(function (x) { return typeof x === "number" && x > 0; })) store.lab = { min: o.lab.min, max: o.lab.max, target: o.lab.target, s: o.lab.s }; store.card = !!o.card;
+  if (o.lab && typeof o.lab === "object" && [o.lab.min, o.lab.max, o.lab.target, o.lab.s].every(function (x) { return typeof x === "number" && x > 0; })) store.lab = { min: o.lab.min, max: o.lab.max, target: o.lab.target, s: o.lab.s }; store.card = !!o.card; store.test = TESTS[o.test] ? o.test : "";
 } } } catch (e) {}
 function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} }
 save();
@@ -299,6 +376,11 @@ function setArt(mode, card) {
 $("aGif").addEventListener("click", function () { setArt("gif"); });
 $("aSync").addEventListener("click", function () { setArt("synced"); });
 $("cardSync").addEventListener("change", function () { setArt(undefined, $("cardSync").checked); });
+// Engine test: ?test=<mode> in the URL selects one too (for a link to send).
+(function () { var q = /[?&]test=([a-z0-9]+)/.exec(location.search); if (q && TESTS[q[1]]) store.test = q[1]; })();
+function paintTest() { $("etest").value = store.test; $("etestinfo").textContent = store.test ? "Engine test on: the meter is at the top left of the player. Reload the track after changing the mode (choosing it here does)." : ""; }
+$("etest").addEventListener("change", function () { store.test = TESTS[$("etest").value] ? $("etest").value : ""; save(); paintTest(); mountFrame(T[idx]); });
+paintTest();
 function setRate(s) {
   var t = T[idx], r = store.r[t.id] || (store.r[t.id] = {});
   r.s = r.s === s ? "" : s;
