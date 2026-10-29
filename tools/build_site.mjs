@@ -162,6 +162,7 @@ details.card>summary{cursor:pointer;font-weight:600;min-height:44px;display:flex
 .row>button{flex:1}
 .artrow{margin:4px 0 8px}.artrow button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-text);font-weight:600}
 .cardsync{display:flex;gap:10px;align-items:flex-start;min-height:44px;padding:4px 0;font-size:14px}.cardsync input{width:24px;height:24px;flex:none}
+.cardsync select{flex:1;min-width:0;max-width:100%}
 .rate button[aria-pressed=true].p{background:var(--pass);border-color:var(--pass);color:#fff}
 .rate button[aria-pressed=true].f{background:var(--fail);border-color:var(--fail);color:#fff}
 textarea{width:100%;min-height:76px;margin-top:10px;padding:10px;border-radius:12px;border:1px solid var(--line);background:var(--bg);resize:vertical}
