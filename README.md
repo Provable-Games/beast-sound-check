@@ -109,7 +109,7 @@ The engine is [pocket-synth](https://github.com/Provable-Games/pocket-synth). on
 - `tokens/<token ID>.txt.gz`: the `token_uri` string exactly as the NFT returned it, gzipped (`storage.compression` in the manifest says so; a set under 25 MB would be stored raw). The site opens one with `new Response(file.stream().pipeThrough(new DecompressionStream("gzip"))).text()` and derives everything else from it.
 - Each token's `tracks` is `[]` for now. A later schema version will list the tracks a token holds, one `{ editionId, trackIndex, acquisition }` per track (`manifest.trackEntryShape`), once Sound Manager editions are live on Sepolia; readers of schema 1 ignore it.
 
-The 2026-10-29 set is 375 files, 67.8 MiB raw and 39.7 MiB gzipped: about 179–196 KB raw (103–118 KB gzipped) per token, rising with the preset (the notes fragment and Shiny art). The player and the art in each `token_uri` are already compressed, so gzip saves only about 40%. **Retention:** keep the latest two sets in the tree (the current deployment and the one before, for A/B listening) and remove older ones in the commit that adds a new set; Git history keeps every set.
+The 2026-10-29 set is 375 files, 67.8 MiB raw and 39.7 MiB gzipped: 172–206 KB raw and 103–119 KB gzipped per token, averaging 179 KB raw at preset 0 up to 196 KB at preset 3 (the notes fragment and Shiny art). The player and the art in each `token_uri` are already compressed, so gzip saves only about 40%. **Retention:** keep the latest two sets in the tree (the current deployment and the one before, for A/B listening) and remove older ones in the commit that adds a new set; Git history keeps every set.
 
 ### Regenerate after a Sepolia deploy
 

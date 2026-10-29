@@ -70,9 +70,15 @@ async function loadBeasts(beasts3) {
 /** The newest deploy/records/renditions-sepolia-*.json in BEASTS3. */
 function latestRecord(beasts3) {
   const dir = path.join(beasts3, "deploy", "records");
-  const found = fs.readdirSync(dir).filter((f) => /^renditions-sepolia-\d{4}-\d{2}-\d{2}(-\d+)?\.json$/.test(f)).sort();
+  // Latest date, then the highest same-day number (a day's first record has none, its second is -2, its tenth -10).
+  const found = [];
+  for (const f of fs.readdirSync(dir)) {
+    const m = /^renditions-sepolia-(\d{4}-\d{2}-\d{2})(?:-(\d+))?\.json$/.exec(f);
+    if (m) found.push({ f, date: m[1], n: m[2] === undefined ? 1 : Number(m[2]) });
+  }
   if (!found.length) throw new Error(`no renditions-sepolia-*.json in ${dir}; mint the set first (scripts/mint-rendition-set.mjs)`);
-  return path.join("deploy", "records", found.at(-1));
+  found.sort((a, b) => (a.date === b.date ? a.n - b.n : a.date < b.date ? -1 : 1));
+  return path.join("deploy", "records", found.at(-1).f);
 }
 
 /** A Standard MIDI File's division and tempo map (FF 51 03 meta events), from its bytes. */
