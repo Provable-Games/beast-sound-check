@@ -177,7 +177,10 @@ const PERIODS = [];
   const Q = { ultraslow: 4, slow: 2, medium: 1, fast: 0.5, ultrafast: 0.25 }, tempoUs = tok.tempo.microsecondsPerQuarter;
   const shipped = tempoUs / 2 < 200000 ? "medium" : "fast";
   const POLICY = new RegExp(D0.sepolia.policy, "g");
-  const withStep = (k) => (k === shipped ? FT[RK].text : FT[RK].text.replace(POLICY, (a, f, b) => `${f}=${b}=>Math.round(${b}*${Q[k]})`));
+  const stepped = (text, k) => (k === shipped ? text : text.replace(POLICY, (a, f, b) => `${f}=${b}=>Math.round(${b}*${Q[k]})`));
+  const withStep = (k) => stepped(FT[RK].text, k);
+  // since beasts-v3 #247 the deployed footer retimes its GIF too: a step other than the shipped one changes the deployed page
+  const deployedAt = (k) => deployedHtml.slice(0, -dep.length) + stepped(dep, k);
   ok("the deployed footer ends the page exactly once", deployedHtml.endsWith(dep) && deployedHtml.indexOf(dep) === deployedHtml.lastIndexOf(dep), `${FT.deployed.title}, ${dep.length} B`);
   ok("a retiming footer is offered, with its policy exactly once", !!RK && (FT[RK].text.match(POLICY) || []).length === 1 && D0.sepolia.footerKeys.join() === ",main", `${RK} ${FT[RK] && FT[RK].commit.slice(0, 7)}`);
   await page.locator("#pw").scrollIntoViewIfNeeded();
@@ -201,9 +204,18 @@ const PERIODS = [];
   const speedState = () => page.evaluate(() => ({ dis: Array.from(document.querySelectorAll("[data-speed]")).map((b) => b.disabled), pressed: Array.from(document.querySelectorAll("[data-speed]")).filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.getAttribute("data-speed")).join(","), why: document.getElementById("speedwhy").textContent, info: document.getElementById("artinfo").textContent, lbl: document.getElementById("speedlbl").textContent }));
   const asDeployed = await pauseRun();
   const banner0 = await page.isHidden("#ftbadge"), sp0 = await speedState();
-  ok("as deployed: the page is the rebuilt animation_url, no banner, the GIF keeps moving while paused", (await srcdoc()) === deployedHtml && banner0 && asDeployed.playing > 0 && asDeployed.paused > 0 && asDeployed.resumed > 0,
+  ok("as deployed: the page is the rebuilt animation_url, no banner, the GIF holds still while paused", (await srcdoc()) === deployedHtml && banner0 && asDeployed.playing > 0 && asDeployed.paused === 0 && asDeployed.resumed > 0,
     `art changes: playing ${asDeployed.playing}, paused ${asDeployed.paused} in 2 s (${asDeployed.pausedShots} shots), resumed ${asDeployed.resumed}`);
-  ok("as deployed: the speed row is off, with the reason", sp0.dis.every(Boolean) && sp0.pressed === "" && /the deployed page doesn't retime its GIF/.test(sp0.why) && /GIF: \d+ ms per frame, on its own clock/.test(sp0.info), `${sp0.why} | ${sp0.info}`);
+  ok("as deployed: the footer retimes its GIF, its policy exactly once; the speed row is on at the shipped step", FT.deployed.retimes && (dep.match(POLICY) || []).length === 1 && sp0.dis.every((d) => !d) && sp0.pressed === shipped && /Retimed GIF: .* per frame, one per eighth note \(Fast\); shipped: eighth note/.test(sp0.info), `${sp0.why} | ${sp0.info}`);
+  // as deployed at Slow: the deployed footer with its policy replaced once, and a speed banner that does not say "not the deployed page"
+  await page.click("[data-speed=slow]");
+  await page.waitForFunction(() => { const f = document.querySelector("#pw iframe"); return f && f.srcdoc.length > 1000; });
+  const bannerSlow = await page.evaluate(() => !document.getElementById("ftbadge").hidden && document.getElementById("ftbadge").textContent);
+  ok("as deployed at Slow: the deployed footer's policy replaced once, a speed banner only", (await srcdoc()) === deployedAt("slow") && /^Animation speed: Slow .*not the shipped speed\.$/.test(bannerSlow || "") && !/not the deployed page/.test(bannerSlow || ""), bannerSlow);
+  await page.click("#speedship");
+  await page.waitForFunction(() => { const f = document.querySelector("#pw iframe"); return f && f.srcdoc.length > 1000; });
+  ok("as deployed, back at the shipped speed: the page untouched", (await srcdoc()) === deployedHtml && (await page.isHidden("#ftbadge")));
+  await page.locator("#pw").scrollIntoViewIfNeeded();
   // the retiming footer at the shipped step: upstream's file byte for byte
   await page.selectOption("#ftsel", RK);
   await page.waitForFunction(() => { const f = document.querySelector("#pw iframe"); return f && f.srcdoc.length > 1000; });
@@ -256,7 +268,7 @@ const PERIODS = [];
       html === deployedHtml.slice(0, -dep.length) + withStep(k) && st.pressed === k && (k === shipped ? !/not the shipped speed/.test(b) : new RegExp(`Animation speed: ${k === "slow" ? "Slow" : "Medium"} .*not the shipped speed\\.$`).test(b)) && Math.abs(r.period - want) < tol,
       `measured ${(r.period * 1000).toFixed(1)} ms from ${r.n} changes in ${r.samples} shots (want ${(want * 1000).toFixed(1)} ms, within ${(tol * 1000).toFixed(1)}) | ${st.info.slice(st.info.indexOf("Retimed"), st.info.indexOf(" GIF's own"))}`);
   }
-  // Ultra fast is never under 2 cs in this set (its fastest tempo makes a sixteenth of 73 ms); the row says so when it is
+  // Ultra fast is never under 2 cs in this set (its fastest tempo makes a sixteenth of about 74 ms); the row says so when it is
   const fastest = Math.min(...set.manifest.tokens.map((t) => t.tempo.microsecondsPerQuarter));
   ok("Ultra fast stays at or above 2 cs a frame in this set", Math.round(fastest * 0.25) >= 20000 && !(await speedState()).dis[4], `fastest tempo ${(60e6 / fastest).toFixed(1)} BPM: a sixteenth is ${(fastest / 4000).toFixed(1)} ms`);
   if (process.env.SHOTS) {
@@ -291,7 +303,8 @@ const PERIODS = [];
   // a saved footer that no longer exists (the merged PR #88's) falls back to As deployed
   await page.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.startsWith("beast-sound-check-")); const o = JSON.parse(localStorage.getItem(k)); o.ft = "pr88"; localStorage.setItem(k, JSON.stringify(o)); });
   await page.reload(); await page.waitForFunction(() => { const f = document.querySelector("#pw iframe"); return f && f.srcdoc.length > 1000 && document.querySelectorAll("#species option").length === 75; }, null, { timeout: 30000 });
-  ok("a saved footer that is gone (PR #88) falls back to As deployed", (await page.inputValue("#ftsel")) === "" && (await srcdoc()) === deployedHtml && (await page.isHidden("#ftbadge")) && (await speedState()).dis.every(Boolean));
+  const fb = await speedState(), fbBanner = await page.evaluate(() => !document.getElementById("ftbadge").hidden && document.getElementById("ftbadge").textContent);
+  ok("a saved footer that is gone (PR #88) falls back to As deployed, at the saved speed", (await page.inputValue("#ftsel")) === "" && (await srcdoc()) === deployedAt("slow") && fb.dis.every((d) => !d) && fb.pressed === "slow" && /^Animation speed: Slow .*not the shipped speed\.$/.test(fbBanner || ""), `${fbBanner} | ${fb.pressed}`);
   await page.click("#speedship");
   await page.waitForFunction(() => { const f = document.querySelector("#pw iframe"); return f && f.srcdoc.length > 1000; });
   ok("back to the shipped speed on a real Beast", (await page.isHidden("#speedship")) && (await srcdoc()) === deployedHtml);
@@ -538,16 +551,16 @@ await page.uncheck("#cardSync");
     await page.uncheck("#cardSync");
     await page.click("#speedship");
   }
-  // off in GIF mode (even with a step chosen) and on a static Beast
+  // off in GIF mode (even with a step chosen)
   await open("2.03"); await page.waitForTimeout(200);
   await page.click("[data-speed=slow]");
   await page.click("#aGif"); await page.waitForTimeout(200);
   const g = { dis: await disabled(), why: await page.textContent("#speedwhy"), as: (await srcdoc()).includes(byLabel("2.03").pages[0].art) };
   ok("speed is off for the original GIF", g.dis.every(Boolean) && /original GIF/.test(g.why) && g.as, `${JSON.stringify(g.dis)} | ${g.why}`);
   await page.click("#aSync");
-  await open("2.04"); await page.waitForTimeout(200);
-  const st = { dis: await disabled(), why: await page.textContent("#speedwhy"), as: (await srcdoc()).includes(byLabel("2.04").pages[1].art), pr: await pressed(), anim: byLabel("2.04").art.animated };
-  ok("speed is off on a static PNG Beast", !st.anim && st.dis.every(Boolean) && /static PNG/.test(st.why) && st.as && st.pr === "", `${JSON.stringify(st.dis)} | ${st.why}`);
+  // every engine-test Beast is animated: beasts-v3 has no static original art since #253
+  const statics = D.tracks.filter((t) => t.art && t.art.animated === false).map((t) => t.sectionId + "." + t.id.slice(1));
+  ok("every engine-test Beast is animated (no static PNG art)", statics.length === 0, statics.join(", ") || `${D.tracks.length} tracks`);
   // the export records the speed each result was rated with, and the setting survives a reload
   await open("2.07"); await page.waitForTimeout(200);
   if ((await page.getAttribute("#bp", "aria-pressed")) === "true") await page.click("#bp");
