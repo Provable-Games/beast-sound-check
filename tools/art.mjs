@@ -15,7 +15,9 @@ const { GifReader } = createRequire(import.meta.url)(path.join(here, "deps/node_
 const B3 = process.env.BEASTS3 || "/workspace/beasts-v3";
 const GENESIS = B3 + "/assets/genesis";
 const fixture = (name) => fs.readFileSync(`${B3}/fixtures/renderer/${name}/raw.svg`, "utf8").replace(/\r?\n\s*/g, "");
-const TEMPLATE = { regular: fixture("regular-animated-tier-4-rank-2-opaque-gif"), shiny: fixture("shiny-animated-tier-3-rank-1242-transparent-gif") };
+// Perfectly centred cards (no print offset or defects; the art is swapped below), so every card lays out the same.
+const TEMPLATE = { regular: fixture("regular-static-tier-1-rank-1-opaque-png"), shiny: fixture("shiny-animated-tier-3-rank-1242-transparent-gif") };
+for (const [k, t] of Object.entries(TEMPLATE)) if (/id='print'|data-play-anchor='(?!235 54 24 top-right')/.test(t)) throw new Error(`template ${k}: not a centred card (print offset or moved play anchor)`);
 
 const crc = (buf) => zlib.crc32(buf);
 const chunk = (type, data) => {

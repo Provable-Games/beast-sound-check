@@ -235,11 +235,11 @@ for (const [type, , tier] of SLOTS) {
 }
 
 // ---- the species queue for the other tracks: remaining species in order, alternating regular and shiny
-// (each track gets its own species while they last; nextArt then deals the other variants), rotating through
-// shiny animated, regular animated, shiny static and regular static
+// (each track gets its own species while they last; nextArt then deals the other variants), alternating shiny
+// and regular, all animated: beasts-v3 has no static original art since #253
 {
   const rest = []; for (let id = 1; id <= 75; id++) if (!reserved.has(id)) rest.push(id);
-  artQueue = rest.map((id, i) => ({ id, shiny: i % 2 === 0, animated: Math.floor(i / 2) % 2 === 0 }));
+  artQueue = rest.map((id, i) => ({ id, shiny: i % 2 === 0, animated: true })); // every original is animated (beasts-v3 #228, #253)
 }
 // Tempo spread for raw-sound checks whose content does not depend on tempo, with a spread of frame counts
 const TEMPOS = [90, 100, 120, 127.66, 131.87, 150, 175];
