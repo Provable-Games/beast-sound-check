@@ -168,12 +168,18 @@ async function artChanges(ms, every = 150) {
   ok("shiny vs regular art", gifs["1genesis"] === gifs["1p1"] && gifs["1p1"] === gifs["1p3"] && gifs["1p0"] === gifs["1p2"] && gifs["1p0"] !== gifs["1p1"] && gifs["75p0"] !== gifs["75p3"] && gifs["75p0"] !== gifs["1p0"], genesisGif ? "and each is the species' canonical genesis GIF" : "(set BEASTS3 to check the canonical files too)");
 }
 
-// ---- the page footer selector, on a preset 0 Beast (no notes or rainbow behind the art)
+// ---- the page footer selector and the retimed GIF's speed, on a preset 0 Beast (no notes or rainbow behind the art)
+const PERIODS = [];
 {
   const tok = await pick(1, "p0");
   const deployedHtml = animationPage(await set.tokenUri(tok.tokenId)).toString("utf8");
-  const dep = FT.deployed.text;
+  const dep = FT.deployed.text, RK = D0.sepolia.footerKeys.find((k) => k && FT[k].retimes);
+  const Q = { ultraslow: 4, slow: 2, medium: 1, fast: 0.5, ultrafast: 0.25 }, tempoUs = tok.tempo.microsecondsPerQuarter;
+  const shipped = tempoUs / 2 < 200000 ? "medium" : "fast";
+  const POLICY = new RegExp(D0.sepolia.policy, "g");
+  const withStep = (k) => (k === shipped ? FT[RK].text : FT[RK].text.replace(POLICY, (a, f, b) => `${f}=${b}=>Math.round(${b}*${Q[k]})`));
   ok("the deployed footer ends the page exactly once", deployedHtml.endsWith(dep) && deployedHtml.indexOf(dep) === deployedHtml.lastIndexOf(dep), `${FT.deployed.title}, ${dep.length} B`);
+  ok("a retiming footer is offered, with its policy exactly once", !!RK && (FT[RK].text.match(POLICY) || []).length === 1 && D0.sepolia.footerKeys.join() === ",main", `${RK} ${FT[RK] && FT[RK].commit.slice(0, 7)}`);
   await page.locator("#pw").scrollIntoViewIfNeeded();
   const pauseRun = async () => {
     const f = await frameOf();
@@ -192,24 +198,74 @@ async function artChanges(ms, every = 150) {
     await f.click("#play");
     return { playing: playing.changes, paused: paused.changes, pausedShots: paused.shots, resumed: resumed.changes, label };
   };
+  const speedState = () => page.evaluate(() => ({ dis: Array.from(document.querySelectorAll("[data-speed]")).map((b) => b.disabled), pressed: Array.from(document.querySelectorAll("[data-speed]")).filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.getAttribute("data-speed")).join(","), why: document.getElementById("speedwhy").textContent, info: document.getElementById("artinfo").textContent, lbl: document.getElementById("speedlbl").textContent }));
   const asDeployed = await pauseRun();
-  const banner0 = await page.isHidden("#ftbadge");
+  const banner0 = await page.isHidden("#ftbadge"), sp0 = await speedState();
   ok("as deployed: the page is the rebuilt animation_url, no banner, the GIF keeps moving while paused", (await srcdoc()) === deployedHtml && banner0 && asDeployed.playing > 0 && asDeployed.paused > 0 && asDeployed.resumed > 0,
     `art changes: playing ${asDeployed.playing}, paused ${asDeployed.paused} in 2 s (${asDeployed.pausedShots} shots), resumed ${asDeployed.resumed}`);
-  await page.selectOption("#ftsel", "pr88");
+  ok("as deployed: the speed row is off, with the reason", sp0.dis.every(Boolean) && sp0.pressed === "" && /the deployed page doesn't retime its GIF/.test(sp0.why) && /GIF: \d+ ms per frame, on its own clock/.test(sp0.info), `${sp0.why} | ${sp0.info}`);
+  // the retiming footer at the shipped step: upstream's file byte for byte
+  await page.selectOption("#ftsel", RK);
   await page.waitForFunction(() => { const f = document.querySelector("#pw iframe"); return f && f.srcdoc.length > 1000; });
-  const pr = await srcdoc();
-  const banner = await page.evaluate(() => !document.getElementById("ftbadge").hidden && document.getElementById("ftbadge").textContent);
-  ok("Pause-freeze PR footer: spliced in place of the deployed footer, banner shows", pr === deployedHtml.slice(0, -dep.length) + FT.pr88.text && /not the deployed page/.test(banner || "") && banner.includes(FT.pr88.commit.slice(0, 7)), banner);
+  const banner = await page.evaluate(() => !document.getElementById("ftbadge").hidden && document.getElementById("ftbadge").textContent), sp1 = await speedState();
+  ok(`${FT[RK].label} footer at the shipped step: upstream's footer byte for byte, banner shows, speed row on`, (await srcdoc()) === deployedHtml.slice(0, -dep.length) + FT[RK].text && /not the deployed page\.$/.test(banner || "") && banner.includes(FT[RK].commit.slice(0, 7)) && sp1.dis.every((d) => !d) && sp1.pressed === shipped && /one GIF frame per/.test(sp1.lbl) && /Retimed GIF: .* per frame, one per eighth note \(Fast\); shipped: eighth note/.test(sp1.info) && /GIF's own: \d+ ms per frame/.test(sp1.info),
+    `${banner} | ${sp1.info}`);
   const freeze = await pauseRun();
-  ok("Pause-freeze PR footer: the art freezes on pause (no change in 2 s) and animates after resume", freeze.playing > 0 && freeze.paused === 0 && freeze.resumed > 0 && freeze.label === "Pause",
+  ok(`${FT[RK].label} footer: the art freezes on pause (no change in 2 s) and animates after resume`, freeze.playing > 0 && freeze.paused === 0 && freeze.resumed > 0 && freeze.label === "Pause",
     `art changes: playing ${freeze.playing}, paused ${freeze.paused} in 2 s (${freeze.pausedShots} shots), resumed ${freeze.resumed}`);
   const checks = await page.textContent("#checks");
-  ok("the pause check follows the footer", /holds still/.test(checks), checks.slice(checks.indexOf("Pause"), checks.indexOf("Pause") + 80));
+  ok("the art and pause checks follow the footer", /holds still/.test(checks) && /retimes it to the music: one frame per eighth note/.test(checks), checks.slice(checks.indexOf("Art:"), checks.indexOf("Art:") + 120));
+  // The measured frame period at a step: screenshots of the Beast against the audible music position (as upstream's
+  // page_check): each change of the art is timed at the middle of the window between the reads around it, and the period
+  // is the slope of those times against the step each is nearest: the median of the slopes between every two
+  // changes on different steps (Theil-Sen). Headless WebKit misplaces some frame changes of a GIF inside an SVG image
+  // (extra changes between the real ones), which a least-squares slope follows and the median does not.
+  const measure = async (step, ms) => {
+    const f = await frameOf();
+    await playFor(f, 1.2);
+    await page.waitForTimeout(300);
+    const box = await page.locator("#pw iframe").boundingBox();
+    const sc = Math.min(box.width / 250, box.height / 350), ox = box.x + (box.width - 250 * sc) / 2, oy = box.y + (box.height - 350 * sc) / 2;
+    const clip = { x: ox + 62 * sc, y: oy + 66 * sc, width: 126 * sc, height: 126 * sc };
+    const pos = () => f.evaluate(() => window.OnchainMidiPlayer.getPlayStatus().positionSeconds);
+    const samples = [], end = Date.now() + ms;
+    while (Date.now() < end) { const p0 = await pos(); const img = decodePng(await page.screenshot({ clip })); samples.push({ p0, p1: await pos(), img }); }
+    await f.click("#play");
+    const all = [];
+    for (let i = 1; i < samples.length; i++) { const a = samples[i - 1], s = samples[i]; if (diffPx(a.img, s.img) > 40) all.push({ t: (a.p0 + a.p1 + s.p0 + s.p1) / 4, window: s.p1 - a.p0 }); }
+    const usual = all.map((c) => c.window).sort((x, y) => x - y)[all.length >> 1] || 0;
+    const list = all.filter((c) => c.window <= Math.max(0.06, 1.5 * usual));
+    if (list.length < 3) return { period: NaN, n: list.length, samples: samples.length };
+    // steps counted from the first change, so the grid's phase (the display lead, the screenshot latency) cannot split
+    // changes between two steps
+    const k = list.map((c) => Math.round((c.t - list[0].t) / step)), slopes = [];
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) if (k[j] !== k[i]) slopes.push((list[j].t - list[i].t) / (k[j] - k[i]));
+    slopes.sort((x, y) => x - y);
+    const period = slopes.length ? (slopes[(slopes.length - 1) >> 1] + slopes[slopes.length >> 1]) / 2 : NaN;
+    return { period, n: list.length, samples: samples.length };
+  };
+  for (const [k, ms] of [[shipped, 8000], ["medium", 8000], ["slow", 10000]]) {
+    if (k !== shipped) { await page.click(`[data-speed=${k}]`); await page.waitForFunction(() => { const f = document.querySelector("#pw iframe"); return f && f.srcdoc.length > 1000; }); }
+    await page.locator("#pw").scrollIntoViewIfNeeded();
+    const html = await srcdoc(), st = await speedState(), want = Math.round(tempoUs * Q[k]) / 1e6;
+    const b = await page.evaluate(() => document.getElementById("ftbadge").textContent);
+    const r = await measure(want, ms);
+    const tol = Math.max(0.006, 0.02 * want);
+    PERIODS.push({ engine, step: k, want: want * 1000, got: r.period * 1000, n: r.n });
+    ok(`${FT[RK].label} footer at ${k}${k === shipped ? " (shipped)" : ""}: the policy ${k === shipped ? "untouched" : "replaced once"}, the GIF's measured period ${(want * 1000).toFixed(1)} ms`,
+      html === deployedHtml.slice(0, -dep.length) + withStep(k) && st.pressed === k && (k === shipped ? !/not the shipped speed/.test(b) : new RegExp(`Animation speed: ${k === "slow" ? "Slow" : "Medium"} .*not the shipped speed\\.$`).test(b)) && Math.abs(r.period - want) < tol,
+      `measured ${(r.period * 1000).toFixed(1)} ms from ${r.n} changes in ${r.samples} shots (want ${(want * 1000).toFixed(1)} ms, within ${(tol * 1000).toFixed(1)}) | ${st.info.slice(st.info.indexOf("Retimed"), st.info.indexOf(" GIF's own"))}`);
+  }
+  // Ultra fast is never under 2 cs in this set (its fastest tempo makes a sixteenth of 73 ms); the row says so when it is
+  const fastest = Math.min(...set.manifest.tokens.map((t) => t.tempo.microsecondsPerQuarter));
+  ok("Ultra fast stays at or above 2 cs a frame in this set", Math.round(fastest * 0.25) >= 20000 && !(await speedState()).dis[4], `fastest tempo ${(60e6 / fastest).toFixed(1)} BPM: a sixteenth is ${(fastest / 4000).toFixed(1)} ms`);
   if (process.env.SHOTS) {
     fs.mkdirSync(process.env.SHOTS, { recursive: true });
     for (const scheme of ["light", "dark"]) {
       await page.emulateMedia({ colorScheme: scheme }); await page.waitForTimeout(200);
+      await page.locator(".speed").evaluate((e) => window.scrollTo(0, e.getBoundingClientRect().top + window.scrollY - 330));
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: path.join(process.env.SHOTS, `${engine}-real-speed-row-${scheme}.png`) });
       await page.locator("#cur").evaluate((e) => window.scrollTo(0, e.getBoundingClientRect().top + window.scrollY - 8));
       await page.waitForTimeout(300);
       await page.screenshot({ path: path.join(process.env.SHOTS, `${engine}-footer-banner-${scheme}.png`) });
@@ -217,29 +273,28 @@ async function artChanges(ms, every = 150) {
     await page.emulateMedia({ colorScheme: "light" });
   }
   const sw3 = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
-  ok("no horizontal scroll with a real Beast and the footer banner", sw3[0] <= sw3[1], `scrollWidth ${sw3[0]} / ${sw3[1]}`);
-  // the rating records the set, block, token, name, preset and footer
-  await page.click("#bp"); await page.fill("#note", "pr88 note"); await page.locator("#note").blur();
+  ok("no horizontal scroll with a real Beast, the footer banner and the speed row", sw3[0] <= sw3[1], `scrollWidth ${sw3[0]} / ${sw3[1]}`);
+  // the rating records the set, block, token, name, preset, footer and speed (Slow is chosen now)
+  await page.click("#bp"); await page.fill("#note", "slow note"); await page.locator("#note").blur();
   await page.evaluate(() => { try { if (navigator.clipboard) navigator.clipboard.writeText = (t) => { window.__clip = t; return Promise.resolve(); }; } catch (e) {} window.__clip = ""; });
   await page.click("#export"); await page.waitForTimeout(200);
   const ex = await page.evaluate(() => window.__clip || document.getElementById("exporttext").value);
   const line = ex.split("\n").find((x) => x.startsWith("PASS " + SETINFO.dir)) || "";
-  ok("export records set, block, token ID, name, preset and footer with its commit", line === `PASS ${SETINFO.dir} block ${set.manifest.blockNumber} token ${tok.tokenId} ${tok.name}, preset 0 (visual 0, sound 0) [footer: ${FT.pr88.label}, onchain-midi-player ${FT.pr88.commit.slice(0, 7)}] - pr88 note`
-    && /^Beasts on Sepolia \(real Beasts\)$/m.test(ex) && /^Engine tests \(onchain-midi-player's reference Beast page\)$/m.test(ex) && new RegExp(`^Pass 1, fail 0, untested ${SETINFO.tokens - 1} of ${SETINFO.tokens}$`, "m").test(ex), line);
-  // persistence: the footer, the Beast shown and its rating survive a reload
+  const slowMs = +(Math.round(tempoUs * 2) / 1000).toFixed(1) + " ms";
+  ok("export records set, block, token ID, name, preset, footer with its commit and the speed", line === `PASS ${SETINFO.dir} block ${set.manifest.blockNumber} token ${tok.tokenId} ${tok.name}, preset 0 (visual 0, sound 0) [footer: ${FT[RK].label}, onchain-midi-player ${FT[RK].commit.slice(0, 7)}; speed: retimed GIF Slow, one frame per half note, ${slowMs} (shipped: ${shipped === "fast" ? "eighth" : "quarter"} note)] - slow note`
+    && /^Beasts on Sepolia \(real Beasts\)$/m.test(ex) && /real-Beast speed now: Slow/.test(ex) && /^Engine tests \(onchain-midi-player's reference Beast page\)$/m.test(ex) && new RegExp(`^Pass 1, fail 0, untested ${SETINFO.tokens - 1} of ${SETINFO.tokens}$`, "m").test(ex), line);
+  // persistence: the footer, the speed, the Beast shown and its rating survive a reload
   await page.reload(); await page.waitForFunction(() => { const f = document.querySelector("#pw iframe"); return f && f.srcdoc.length > 1000 && document.querySelectorAll("#species option").length === 75; }, null, { timeout: 30000 });
-  const kept = await page.evaluate(() => ({ ft: document.getElementById("ftsel").value, ttl: document.getElementById("ttl").textContent, bp: document.getElementById("bp").getAttribute("aria-pressed"), note: document.getElementById("note").value, banner: !document.getElementById("ftbadge").hidden }));
-  ok("real Beast, footer and rating persist across a reload", kept.ft === "pr88" && kept.ttl.startsWith(tok.name) && kept.bp === "true" && kept.note === "pr88 note" && kept.banner && (await srcdoc()).endsWith(FT.pr88.text), JSON.stringify(kept));
+  const kept = await page.evaluate(() => ({ ft: document.getElementById("ftsel").value, ttl: document.getElementById("ttl").textContent, bp: document.getElementById("bp").getAttribute("aria-pressed"), note: document.getElementById("note").value, banner: !document.getElementById("ftbadge").hidden, speed: Array.from(document.querySelectorAll("[data-speed]")).filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.getAttribute("data-speed")).join() }));
+  ok("real Beast, footer, speed and rating persist across a reload", kept.ft === RK && kept.speed === "slow" && kept.ttl.startsWith(tok.name) && kept.bp === "true" && kept.note === "slow note" && kept.banner && (await srcdoc()).endsWith(withStep("slow")), JSON.stringify(kept));
   await page.click("#bp"); await page.fill("#note", ""); await page.locator("#note").blur();
-  await page.selectOption("#ftsel", "main");
+  // a saved footer that no longer exists (the merged PR #88's) falls back to As deployed
+  await page.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.startsWith("beast-sound-check-")); const o = JSON.parse(localStorage.getItem(k)); o.ft = "pr88"; localStorage.setItem(k, JSON.stringify(o)); });
+  await page.reload(); await page.waitForFunction(() => { const f = document.querySelector("#pw iframe"); return f && f.srcdoc.length > 1000 && document.querySelectorAll("#species option").length === 75; }, null, { timeout: 30000 });
+  ok("a saved footer that is gone (PR #88) falls back to As deployed", (await page.inputValue("#ftsel")) === "" && (await srcdoc()) === deployedHtml && (await page.isHidden("#ftbadge")) && (await speedState()).dis.every(Boolean));
+  await page.click("#speedship");
   await page.waitForFunction(() => { const f = document.querySelector("#pw iframe"); return f && f.srcdoc.length > 1000; });
-  const before = errors.length, mainHtml = await srcdoc();
-  let mainPlay = "";
-  try { await page.locator("#pw").scrollIntoViewIfNeeded(); const f = await frameOf(); await playFor(f); mainPlay = "playing"; await f.click("#play"); } catch (e) { mainPlay = String(e).split("\n")[0]; }
-  ok("upstream main footer: spliced, plays on the 0.7.0 page without errors", mainHtml === deployedHtml.slice(0, -dep.length) + FT.main.text && mainPlay === "playing" && errors.length === before, `${mainPlay}${errors.length > before ? ", " + errors.slice(before).join(" | ") : ""}`);
-  await page.selectOption("#ftsel", "");
-  await page.waitForFunction(() => { const f = document.querySelector("#pw iframe"); return f && f.srcdoc.length > 1000; });
-  ok("back to as deployed: byte-identical again, banner gone", (await srcdoc()) === deployedHtml && (await page.isHidden("#ftbadge")));
+  ok("back to the shipped speed on a real Beast", (await page.isHidden("#speedship")) && (await srcdoc()) === deployedHtml);
   if (process.env.SHOTS) {
     await pick(1, "p3");
     for (const scheme of ["light", "dark"]) {
@@ -514,6 +569,7 @@ await page.uncheck("#cardSync");
   ok("no horizontal scroll with the speed row", sw2[0] <= sw2[1], `scrollWidth ${sw2[0]} / ${sw2[1]}`);
 }
 
+for (const r of PERIODS) console.log(`period ${r.engine} ${r.step}: want ${r.want.toFixed(1)} ms, measured ${r.got.toFixed(1)} ms (${r.n} changes)`);
 ok("no console errors", errors.length === 0, errors.slice(0, 3).join(" | "));
 ok("no network requests", requests.length === 0, requests.slice(0, 3).join(" | "));
 await browser.close();
