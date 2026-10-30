@@ -1,0 +1,7 @@
+{
+  "revision": "e9b0f66c67c5d6ba1755753ad712d3a20f95ee00",
+  "adapterHash": "3bed767f41b280550a685edd399afdc36b0622c0e90b4d6c18dada33cb6dd551",
+  "casesHash": "e9fa7b1f00916dc482639f841397b0c7e483e6badb496b7a9cbb6f8c3796c145",
+  "cases": 1611,
+  "result": "identical MIDI bytes and Cairo settings hashes"
+}

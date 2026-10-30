@@ -84,7 +84,7 @@ const sha = (b) => crypto.createHash("sha256").update(b).digest("hex");
 const gifOf = (html) => { const m = /<img id="beast-art"[^>]*src="data:image\/svg\+xml;base64,([^"]+)"/.exec(html); const svg = m ? Buffer.from(m[1], "base64").toString("utf8") : ""; const g = /data:image\/gif;base64,([A-Za-z0-9+/=]+)/.exec(svg); return g ? sha(Buffer.from(g[1], "base64")) : null; };
 const genesisGif = process.env.BEASTS3 ? new Map(JSON.parse(fs.readFileSync(path.join(process.env.BEASTS3, "assets/genesis/manifest.json"), "utf8")).assets.filter((a) => a.mime === "image/gif").map((a) => [a.sha256, a])) : null;
 
-await page.goto(URL0);
+await page.goto(URL0 + "#beast-01-genesis");
 console.log(engine, browser.version(), "set", SETINFO.dir);
 await page.waitForFunction(() => document.querySelectorAll("#species option").length === 75 && !!document.querySelector("#pw iframe"), null, { timeout: 30000 });
 const n = await page.locator(".trk").count();
@@ -336,7 +336,7 @@ const PERIODS = [];
   await p2.close();
   const c3 = await newCtx(); await c3.addInitScript(() => { try { Object.defineProperty(window.crypto, "subtle", { get: () => undefined }); } catch (e) {} });
   const p3 = await c3.newPage();
-  await p3.goto(URL0); await p3.waitForSelector("#seperr:not([hidden])", { timeout: 20000 });
+  await p3.goto(URL0 + "#beast-01-genesis"); await p3.waitForSelector("#seperr:not([hidden])", { timeout: 20000 });
   await p3.waitForSelector("#pw iframe", { timeout: 20000 });
   const r3 = await p3.evaluate(() => ({ err: document.getElementById("seperr").textContent, kick: document.getElementById("kick").textContent, sel: document.getElementById("species").disabled }));
   ok("without crypto.subtle: a clear message, real Beasts off, the engine tests still load", /secure context/.test(r3.err) && /localhost/.test(r3.err) && r3.sel && r3.kick.startsWith("Engine test"), r3.err.slice(0, 120));

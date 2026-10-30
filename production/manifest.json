@@ -1,0 +1,550 @@
+{
+  "schema": "beast-production-sampler/v1",
+  "revision": "e9b0f66c67c5d6ba1755753ad712d3a20f95ee00",
+  "adapterHash": "3bed767f41b280550a685edd399afdc36b0622c0e90b4d6c18dada33cb6dd551",
+  "worker": "production/composer-add18d2ae2b18652.js",
+  "data": "production/data-c8211b3d0dbe51c2.json.gz",
+  "identity": "8b9799db223a06e0e1b3",
+  "species": [
+    {
+      "id": 1,
+      "name": "Warlock"
+    },
+    {
+      "id": 2,
+      "name": "Typhon"
+    },
+    {
+      "id": 3,
+      "name": "Jiangshi"
+    },
+    {
+      "id": 4,
+      "name": "Anansi"
+    },
+    {
+      "id": 5,
+      "name": "Basilisk"
+    },
+    {
+      "id": 6,
+      "name": "Gorgon"
+    },
+    {
+      "id": 7,
+      "name": "Kitsune"
+    },
+    {
+      "id": 8,
+      "name": "Lich"
+    },
+    {
+      "id": 9,
+      "name": "Chimera"
+    },
+    {
+      "id": 10,
+      "name": "Wendigo"
+    },
+    {
+      "id": 11,
+      "name": "Rakshasa"
+    },
+    {
+      "id": 12,
+      "name": "Werewolf"
+    },
+    {
+      "id": 13,
+      "name": "Banshee"
+    },
+    {
+      "id": 14,
+      "name": "Draugr"
+    },
+    {
+      "id": 15,
+      "name": "Vampire"
+    },
+    {
+      "id": 16,
+      "name": "Goblin"
+    },
+    {
+      "id": 17,
+      "name": "Ghoul"
+    },
+    {
+      "id": 18,
+      "name": "Wraith"
+    },
+    {
+      "id": 19,
+      "name": "Sprite"
+    },
+    {
+      "id": 20,
+      "name": "Kappa"
+    },
+    {
+      "id": 21,
+      "name": "Fairy"
+    },
+    {
+      "id": 22,
+      "name": "Leprechaun"
+    },
+    {
+      "id": 23,
+      "name": "Kelpie"
+    },
+    {
+      "id": 24,
+      "name": "Pixie"
+    },
+    {
+      "id": 25,
+      "name": "Gnome"
+    },
+    {
+      "id": 26,
+      "name": "Griffin"
+    },
+    {
+      "id": 27,
+      "name": "Manticore"
+    },
+    {
+      "id": 28,
+      "name": "Phoenix"
+    },
+    {
+      "id": 29,
+      "name": "Dragon"
+    },
+    {
+      "id": 30,
+      "name": "Minotaur"
+    },
+    {
+      "id": 31,
+      "name": "Qilin"
+    },
+    {
+      "id": 32,
+      "name": "Ammit"
+    },
+    {
+      "id": 33,
+      "name": "Nue"
+    },
+    {
+      "id": 34,
+      "name": "Skinwalker"
+    },
+    {
+      "id": 35,
+      "name": "Chupacabra"
+    },
+    {
+      "id": 36,
+      "name": "Weretiger"
+    },
+    {
+      "id": 37,
+      "name": "Wyvern"
+    },
+    {
+      "id": 38,
+      "name": "Roc"
+    },
+    {
+      "id": 39,
+      "name": "Harpy"
+    },
+    {
+      "id": 40,
+      "name": "Pegasus"
+    },
+    {
+      "id": 41,
+      "name": "Hippogriff"
+    },
+    {
+      "id": 42,
+      "name": "Fenrir"
+    },
+    {
+      "id": 43,
+      "name": "Jaguar"
+    },
+    {
+      "id": 44,
+      "name": "Satori"
+    },
+    {
+      "id": 45,
+      "name": "Direwolf"
+    },
+    {
+      "id": 46,
+      "name": "Bear"
+    },
+    {
+      "id": 47,
+      "name": "Wolf"
+    },
+    {
+      "id": 48,
+      "name": "Mantis"
+    },
+    {
+      "id": 49,
+      "name": "Spider"
+    },
+    {
+      "id": 50,
+      "name": "Rat"
+    },
+    {
+      "id": 51,
+      "name": "Kraken"
+    },
+    {
+      "id": 52,
+      "name": "Colossus"
+    },
+    {
+      "id": 53,
+      "name": "Balrog"
+    },
+    {
+      "id": 54,
+      "name": "Leviathan"
+    },
+    {
+      "id": 55,
+      "name": "Tarrasque"
+    },
+    {
+      "id": 56,
+      "name": "Titan"
+    },
+    {
+      "id": 57,
+      "name": "Nephilim"
+    },
+    {
+      "id": 58,
+      "name": "Behemoth"
+    },
+    {
+      "id": 59,
+      "name": "Hydra"
+    },
+    {
+      "id": 60,
+      "name": "Juggernaut"
+    },
+    {
+      "id": 61,
+      "name": "Oni"
+    },
+    {
+      "id": 62,
+      "name": "Jotunn"
+    },
+    {
+      "id": 63,
+      "name": "Ettin"
+    },
+    {
+      "id": 64,
+      "name": "Cyclops"
+    },
+    {
+      "id": 65,
+      "name": "Giant"
+    },
+    {
+      "id": 66,
+      "name": "Nemean Lion"
+    },
+    {
+      "id": 67,
+      "name": "Berserker"
+    },
+    {
+      "id": 68,
+      "name": "Yeti"
+    },
+    {
+      "id": 69,
+      "name": "Golem"
+    },
+    {
+      "id": 70,
+      "name": "Ent"
+    },
+    {
+      "id": 71,
+      "name": "Troll"
+    },
+    {
+      "id": 72,
+      "name": "Bigfoot"
+    },
+    {
+      "id": 73,
+      "name": "Ogre"
+    },
+    {
+      "id": 74,
+      "name": "Orc"
+    },
+    {
+      "id": 75,
+      "name": "Skeleton"
+    }
+  ],
+  "prefixes": [
+    "Agony",
+    "Apocalypse",
+    "Armageddon",
+    "Beast",
+    "Behemoth",
+    "Blight",
+    "Blood",
+    "Bramble",
+    "Brimstone",
+    "Brood",
+    "Carrion",
+    "Cataclysm",
+    "Chimeric",
+    "Corpse",
+    "Corruption",
+    "Damnation",
+    "Death",
+    "Demon",
+    "Dire",
+    "Dragon",
+    "Dread",
+    "Doom",
+    "Dusk",
+    "Eagle",
+    "Empyrean",
+    "Fate",
+    "Foe",
+    "Gale",
+    "Ghoul",
+    "Gloom",
+    "Glyph",
+    "Golem",
+    "Grim",
+    "Hate",
+    "Havoc",
+    "Honour",
+    "Horror",
+    "Hypnotic",
+    "Kraken",
+    "Loath",
+    "Maelstrom",
+    "Mind",
+    "Miracle",
+    "Morbid",
+    "Oblivion",
+    "Onslaught",
+    "Pain",
+    "Pandemonium",
+    "Phoenix",
+    "Plague",
+    "Rage",
+    "Rapture",
+    "Rune",
+    "Skull",
+    "Sol",
+    "Soul",
+    "Sorrow",
+    "Spirit",
+    "Storm",
+    "Tempest",
+    "Torment",
+    "Vengeance",
+    "Victory",
+    "Viper",
+    "Vortex",
+    "Woe",
+    "Wrath",
+    "Lights",
+    "Shimmering"
+  ],
+  "suffixes": [
+    "Bane",
+    "Root",
+    "Bite",
+    "Song",
+    "Roar",
+    "Grasp",
+    "Instrument",
+    "Glow",
+    "Bender",
+    "Shadow",
+    "Whisper",
+    "Shout",
+    "Growl",
+    "Tear",
+    "Peak",
+    "Form",
+    "Sun",
+    "Moon"
+  ],
+  "styles": [
+    {
+      "index": 0,
+      "key": "waltz",
+      "label": "Waltz",
+      "description": "3/4, oom-pah-pah under a lyrical lead"
+    },
+    {
+      "index": 1,
+      "key": "chorale",
+      "label": "Chorale / Hymn",
+      "description": "half-note block harmony under a hymn tune, organ"
+    },
+    {
+      "index": 2,
+      "key": "lullaby",
+      "label": "Lullaby / Nocturne",
+      "description": "6/8, music-box arpeggios, slow lead"
+    },
+    {
+      "index": 3,
+      "key": "dirge",
+      "label": "Dirge",
+      "description": "Phrygian, drone bass, tolling bells, long lead lines"
+    },
+    {
+      "index": 4,
+      "key": "boss",
+      "label": "Boss Battle",
+      "description": "driving 4/4, power stabs over an eighth-note bass, the fight theme"
+    },
+    {
+      "index": 5,
+      "key": "shanty",
+      "label": "Sea Shanty",
+      "description": "6/8, a stomping bass, squeezebox chords, a rolling tune"
+    },
+    {
+      "index": 6,
+      "key": "march",
+      "label": "March",
+      "description": "2/4, an oom-pah bass, the snare, a brassy tune"
+    },
+    {
+      "index": 7,
+      "key": "dungeon",
+      "label": "Dungeon Crawl",
+      "description": "a slow minor ostinato, sparse bells, long lead lines"
+    },
+    {
+      "index": 8,
+      "key": "tango",
+      "label": "Tango",
+      "description": "a habanera bass, staccato chord stabs, a sultry lead"
+    },
+    {
+      "index": 9,
+      "key": "speedrun",
+      "label": "Speedrun",
+      "description": "a chiptune chase: racing arpeggios over a driving bass"
+    },
+    {
+      "index": 10,
+      "key": "punk",
+      "label": "Punk",
+      "description": "power chords on every eighth, a pounding bass, snare on two and four"
+    },
+    {
+      "index": 11,
+      "key": "hoedown",
+      "label": "Hoedown",
+      "description": "2/4 bluegrass: boom-chick bass, plucked off-beats, a fiddle tune"
+    },
+    {
+      "index": 12,
+      "key": "tarantella",
+      "label": "Tarantella",
+      "description": "a whirling 6/8 dance in minor"
+    },
+    {
+      "index": 13,
+      "key": "reel",
+      "label": "Celtic Reel",
+      "description": "a running reel over a drone, light drums"
+    },
+    {
+      "index": 14,
+      "key": "surf",
+      "label": "Surf Rock",
+      "description": "tremolo picking over a tom groove, in minor"
+    },
+    {
+      "index": 15,
+      "key": "galop",
+      "label": "Galop",
+      "description": "a 2/4 can-can: oom-pah at a gallop, snare pickups"
+    },
+    {
+      "index": 16,
+      "key": "klezmer",
+      "label": "Klezmer",
+      "description": "a 2/4 hora in harmonic minor, an ornamented lead"
+    },
+    {
+      "index": 17,
+      "key": "samba",
+      "label": "Samba",
+      "description": "a 2/4 carnival: syncopated bass, busy toms and hats"
+    },
+    {
+      "index": 18,
+      "key": "overworld",
+      "label": "Overworld Theme",
+      "description": "a bouncing platformer theme: staccato chords, an octave bass"
+    },
+    {
+      "index": 19,
+      "key": "disco",
+      "label": "Hi-NRG",
+      "description": "four on the floor, off-beat hats, an octave-pumping bass"
+    },
+    {
+      "index": 20,
+      "key": "shuffle",
+      "label": "Shuffle",
+      "description": "a swung 4/4: a walking bass, snare on two and four"
+    },
+    {
+      "index": 21,
+      "key": "mazurka",
+      "label": "Mazurka",
+      "description": "a 3/4 dance with the accent on two, a dotted lead"
+    },
+    {
+      "index": 22,
+      "key": "whirl",
+      "label": "Whirling Dance",
+      "description": "a 2+2+3 dance in 7/8, tom-heavy, in harmonic minor"
+    }
+  ],
+  "parity": {
+    "revision": "e9b0f66c67c5d6ba1755753ad712d3a20f95ee00",
+    "adapterHash": "3bed767f41b280550a685edd399afdc36b0622c0e90b4d6c18dada33cb6dd551",
+    "casesHash": "e9fa7b1f00916dc482639f841397b0c7e483e6badb496b7a9cbb6f8c3796c145",
+    "cases": 1611,
+    "result": "identical MIDI bytes and Cairo settings hashes"
+  },
+  "workerBytes": 128135,
+  "dataBytes": 219831
+}
