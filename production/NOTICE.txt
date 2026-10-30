@@ -1,6 +1,6 @@
 Beast Sound reference engine: https://github.com/caseywescott/midi_fun_contract at e9b0f66c67c5d6ba1755753ad712d3a20f95ee00
 
-workspace/midi_fun_contract/LICENSE
+midi_fun_contract/LICENSE
 MIT License
 
 Copyright (c) 2024-2026 Casey Wescott

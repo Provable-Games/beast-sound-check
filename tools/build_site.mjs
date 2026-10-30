@@ -62,6 +62,14 @@ if (!sets.length) throw new Error("no rendition set in renditions/ (see the READ
 const footers = (() => {
   const B3 = need("BEASTS3");
   const pm = JSON.parse(fs.readFileSync(path.join(B3, "assets/player-page/manifest.json"), "utf8"));
+  // The production sampler uses Beasts' current isolated-art page and notes redraw behavior.
+  // Keep the reference consumer fragments in data.fixed for the existing engine tests.
+  data.production.page = { source: pm.source, fragments: {} };
+  for (const name of ["head", "body", "notes", "footer"]) {
+    const spec = pm.fragments[name], text = fs.readFileSync(path.join(B3, spec.path), "utf8");
+    if (sha256(text) !== spec.sha256 || Buffer.byteLength(text) !== spec.bytes) throw new Error(`beasts-v3's ${name} differs from its manifest`);
+    data.production.page.fragments[name] = text;
+  }
   const deployed = fs.readFileSync(path.join(B3, pm.fragments.footer.path), "utf8");
   if (sha256(deployed) !== pm.fragments.footer.sha256 || Buffer.byteLength(deployed) !== pm.fragments.footer.bytes) throw new Error("beasts-v3's vendored footer differs from its manifest");
   const adapted = git(need(FOOTER_CHOICES[0].env), "show", `${pm.source.revision}:${FOOTER}`) !== deployed;
@@ -319,7 +327,7 @@ ${BANNER}
 <section class="card" id="sampler" aria-labelledby="sample-hd">
   <div class="kicker">Proposed production sound</div>
   <h2 id="sample-hd">Sample all 75 Beasts</h2>
-  <p class="muted">Choose a track and sound effects, then step through the species with the same settings. Change a name, style or seed to explore variations.</p>
+  <p class="muted">Choose a track and sound effects, then step through the species with the same settings. The selected MIDI scrolls behind every Beast. Change a name, style or seed to explore variations.</p>
   <div class="samplegrid">
     <label class="field"><span>Species</span><select id="sample-species"></select></label>
     <label class="field"><span>Track</span><select id="sample-kind"><option value="species">Species Song</option><option value="check">Sound Check</option><option value="name">Name Song</option><option value="purchase">Custom canon (edition 0)</option><option value="edition">Edition track</option></select></label>
