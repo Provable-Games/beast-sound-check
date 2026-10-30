@@ -57,6 +57,7 @@ const sets = (fs.existsSync(RENDITIONS) ? fs.readdirSync(RENDITIONS) : []).filte
   return { dir, network: m.network, chainId: m.chainId, blockNumber: m.blockNumber, generatedAt: m.generatedAt, tokens: m.tokens.length, tinysynth: m.contracts?.tinysynth?.version ?? "" };
 }).sort((a, b) => b.blockNumber - a.blockNumber || (a.generatedAt < b.generatedAt ? 1 : -1));
 if (!sets.length) throw new Error("no rendition set in renditions/ (see the README's Sepolia rendition sets)");
+data.production.notesPresets = JSON.parse(fs.readFileSync(path.join(RENDITIONS, sets[0].dir, "manifest.json"), "utf8")).renderer.notesPresets;
 
 // The page footers: the deployed one (the real pages carry it) and the alternatives the selector splices in.
 const footers = (() => {
@@ -327,11 +328,11 @@ ${BANNER}
 <section class="card" id="sampler" aria-labelledby="sample-hd">
   <div class="kicker">Proposed production sound</div>
   <h2 id="sample-hd">Sample all 75 Beasts</h2>
-  <p class="muted">Choose a track and sound effects, then step through the species with the same settings. The selected MIDI scrolls behind every Beast. Change a name, style or seed to explore variations.</p>
+  <p class="muted">Choose a track and effects preset, then step through the species with the same settings. MIDI notes follow the Sepolia visual preset: off for 0 and 1, on for 2 and 3. Change a name, style or seed to explore variations.</p>
   <div class="samplegrid">
     <label class="field"><span>Species</span><select id="sample-species"></select></label>
     <label class="field"><span>Track</span><select id="sample-kind"><option value="species">Species Song</option><option value="check">Sound Check</option><option value="name">Name Song</option><option value="purchase">Custom canon (edition 0)</option><option value="edition">Edition track</option></select></label>
-    <label class="field samplewide"><span>Sound effects</span><select id="sample-fx"><option value="0">0 · As written</option><option value="1">1 · Mega</option><option value="2">2 · Chip echo / portato</option><option value="3">3 · Mega + chip echo / accent</option></select></label>
+    <label class="field samplewide"><span>Effects preset (visual + sound)</span><select id="sample-fx"><option value="0">0 · As written</option><option value="1">1 · Mega</option><option value="2">2 · Chip echo / portato</option><option value="3">3 · Mega + chip echo / accent</option></select></label>
     <div class="samplegrid samplewide" id="sample-name-row">
       <label class="field"><span>Name prefix</span><select id="sample-prefix"></select></label>
       <label class="field"><span>Name suffix</span><select id="sample-suffix"></select></label>

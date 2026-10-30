@@ -33,8 +33,18 @@ const ready = async (text) => {
 };
 const frame = () => page.frames().find(f => f !== page.mainFrame());
 const source = await productionSource();
+const built = JSON.parse(fs.readFileSync(path.join(root, 'index.html'), 'utf8').match(/<script[^>]+id="data"[^>]*>([\s\S]*?)<\/script>/)[1]);
+const rendition = JSON.parse(fs.readFileSync(path.join(root, 'renditions', built.sepolia.sets[0].dir, 'manifest.json'), 'utf8'));
 async function notesVisible() {
   await page.locator('#pw').scrollIntoViewIfNeeded();
+  await frame().waitForSelector('#play:not([disabled])');
+  const preset = +await page.locator('#sample-fx').inputValue();
+  const expected = !!((rendition.renderer.notesPresets >> preset) & 1);
+  assert.equal(await frame().locator('script#beast-notes').count(), +expected);
+  if (!expected) {
+    assert.equal(await frame().locator('canvas').count(), 0);
+    return;
+  }
   await frame().waitForFunction(() => {
     const c = document.querySelector('canvas');
     if (!c || !c.width || !c.height) return false;
@@ -101,7 +111,7 @@ try {
   const pausedNotes = await notesPixels();
   await page.waitForTimeout(350);
   assert.equal(await notesPixels(), pausedNotes);
-  console.log('PASS MIDI notes visible for every sound preset, scroll during playback and freeze on pause');
+  console.log('PASS Sepolia visual notes mask: no notes for 0/1, scrolling and pause-freeze for 2/3');
   await page.click('#bf'); await page.locator('#note').fill('Sampler regression note'); await page.locator('#note').blur();
   const ratedUrl = page.url();
   await page.click('#sample-next-seed'); await ready();

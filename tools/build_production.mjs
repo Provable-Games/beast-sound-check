@@ -61,8 +61,8 @@ self.onmessage = async event => {
       .replaceAll('__PREFIX__', esc(nm.prefix ? table.prefixes[nm.prefix - 1] : ''))
       .replaceAll('__SUFFIX__', esc(nm.suffix ? table.suffixes[nm.suffix - 1] : ''))
       .replaceAll('__TITLE__', esc(title));
-    // A listening preview shows the selected MIDI for every sound preset. The deployed token
-    // pages separately preserve their renderer's notes mask (presets 2 and 3).
+    // Keep the renderer's inert notes marker on the card. The page includes the notes module
+    // only when the visual preset supports it, according to the Sepolia rendition manifest.
     self.postMessage({ request, input: x, midi: result.midi, settings: shared.settings[result.settingsKey], svg, info: result.info }, [result.midi.buffer]);
   } catch(e) { self.postMessage({ request, error: e.message || String(e) }); }
 };`, resolveDir: root, sourcefile: 'production-worker.js' }, bundle: true, write: false, platform: 'browser', format: 'iife', target: 'es2020', minify: true, legalComments: 'eof' });
