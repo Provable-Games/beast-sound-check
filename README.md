@@ -12,9 +12,11 @@ Each real Beast is a token's exact `animation_url` page from the newest renditio
 
 The picker is the species (all 75, by name) and the variant (its Genesis Beast, or presets 0 to 3, sound effects equal to the preset); the default is the Genesis Warlock, and Prev and Next step through all 375 before the engine tests. Each variant shows its facts (token ID, name, preset, shiny, notes, rainbow, tempo and block) and its own checks. With more than one set in `renditions/`, a selector offers the older ones (the newest, by block, is the default). The list's section 1 has one row per species with its rated variants.
 
-The **Page footer** selector splices another footer fragment into a real Beast's page: **As deployed** (the default: the page untouched, with Beasts' vendored footer, byte-identical to onchain-midi-player `504f231`'s); **Upstream main** (onchain-midi-player `origin/main`'s `examples/beast_consumer/fixtures/footer.html`, the footer the engine tests' reference page runs); and **Pause-freeze PR** ([onchain-midi-player#88](https://github.com/Provable-Games/onchain-midi-player/pull/88), the same file from `origin/feat/pause-freezes-img-art`, which freezes the isolated GIF while the music is paused). The footer is the page's last fragment, so the splice replaces exactly the deployed footer's bytes at the end of the page, and refuses unless they occur exactly once and last. The alternatives are baked into the build with their commits; a non-default footer shows a "not the deployed page" banner. As deployed, the art keeps moving while the music is paused; with the PR footer it holds still and moves again on play.
+The **Page footer** selector splices another footer fragment into a real Beast's page: **As deployed** (the default: the page untouched, with Beasts' vendored footer, byte-identical to onchain-midi-player `504f231`'s); and **Upstream main** (onchain-midi-player `origin/main`'s `examples/beast_consumer/fixtures/footer.html`, which since [#88](https://github.com/Provable-Games/onchain-midi-player/pull/88) freezes the isolated GIF while the music is paused and since [#93](https://github.com/Provable-Games/onchain-midi-player/pull/93) retimes it to the music's beat). The footer is the page's last fragment, so the splice replaces exactly the deployed footer's bytes at the end of the page, and refuses unless they occur exactly once and last. The alternatives are baked into the build with their commits, from the list `FOOTER_CHOICES` in `tools/build_site.mjs`: another footer (an open PR's, say) is one more entry there and one more checkout. A saved choice that is no longer offered (the "Pause-freeze PR" option this page had until #88 merged) falls back to As deployed. A non-default footer shows a "not the deployed page" banner. As deployed, the art keeps moving at its own speed while the music is paused; with upstream main it plays on the beat, holds still on pause and moves again on play.
 
-Each real Beast's result records the set, block, token ID, name, preset, and the page footer it was rated with and its commit; the export lists them under "Beasts on Sepolia", and the engine tests keep their own summary below. Results are keyed by set and token ID, so engine-test results saved before this change still load.
+**Tuning the retimed GIF.** The **Animation speed** row drives the retimed GIF on real Beasts too, when the chosen footer retimes it (the build marks a footer that does); as deployed it is off, because the deployed page doesn't retime its GIF. The footer times each frame with its frame-length policy, `frameUs`: an eighth note, or a quarter note above 150 BPM, the same policy as the engine tests' Synced art. At the shipped step (dashed) the footer is upstream's file byte for byte. Any other step (Ultra slow to Ultra fast: a whole, half, quarter, eighth or sixteenth note per frame) replaces that one expression in the footer's text, which in the built footer reads `i=t=>t/2<2e5?t:Math.round(t/2)`, with `i=t=>Math.round(t*q)`, `q` quarter notes per frame. The substitution must match exactly once: the build checks it, and the page re-checks it and refuses to play with a clear message otherwise. The speed is a setting of the page (shared with the engine tests, and `?speed=` sets it too); the banner says when it is not the shipped one. A GIF frame shows at least 2 cs (browsers show 0 and 1 cs as 100 ms, and the retimer never writes less than 2 cs), so a step whose frame would be under 20 ms at a Beast's tempo is turned off for that Beast, and a chosen one plays at the shipped speed instead. That cannot happen in the 2026-10-29 set, whose fastest tempo (204.4 BPM) makes a sixteenth 73.4 ms. The info line shows the tempo, the frame length at the chosen step, the shipped step and its frame length, and the GIF's own frame length.
+
+Each real Beast's result records the set, block, token ID, name, preset, the page footer it was rated with and its commit, and the speed (a step of the retimed GIF, or the GIF's own timing); the export lists them under "Beasts on Sepolia", and the engine tests keep their own summary below. Results are keyed by set and token ID, so engine-test results saved before this change still load.
 
 ## Engine tests
 
@@ -30,7 +32,7 @@ Its art is the Beasts V3 card template as the renderer draws it (beasts-v3's ren
 
 ## Rebuild
 
-The page is built from three other repos, from clean worktrees at `main` (the footer alternatives come from two more onchain-midi-player checkouts), plus the rendition sets in `renditions/`:
+The page is built from three other repos, from clean worktrees at `main` (the footer alternative comes from one more onchain-midi-player checkout), plus the rendition sets in `renditions/`:
 
 | Variable | Repo | What the build takes from it |
 | --- | --- | --- |
@@ -38,9 +40,8 @@ The page is built from three other repos, from clean worktrees at `main` (the fo
 | `BEAST` | [midi_fun_contract](https://github.com/caseywescott/midi_fun_contract) | Casey's beast-sound engine: the TinyChip settings and bank, and the species names, for the engine tests |
 | `BEASTS3` | [beasts-v3](https://github.com/Provable-Games/beasts-v3) (private) | The engine tests' card template and the 75 genesis GIFs; the deployed page footer (`assets/player-page/footer.html`, checked against its manifest and against onchain-midi-player's file at the manifest's source revision) |
 | `OMP_MAIN` | onchain-midi-player at `origin/main` | The "Upstream main" page footer (`examples/beast_consumer/fixtures/footer.html`) and its commit |
-| `OMP_PR88` | onchain-midi-player at `origin/feat/pause-freezes-img-art` ([#88](https://github.com/Provable-Games/onchain-midi-player/pull/88)) | The "Pause-freeze PR" page footer and its commit |
 
-`build_site.mjs` bakes in each footer's text, commit and SHA-256 and a summary of each set in `renditions/`; it does not embed the sets. `OMP` may be a different commit from `OMP_MAIN`: the engine tests follow `OMP`, the footer selector follows `OMP_MAIN` and `OMP_PR88`. Rebuild when either footer branch moves or a set is added. When #88 merges, point `OMP_PR88` at its merge commit (or drop the option once the deployed footer has it).
+`build_site.mjs` bakes in each footer's text, commit and SHA-256 and a summary of each set in `renditions/`; it does not embed the sets. `OMP` may be a different commit from `OMP_MAIN`: the engine tests follow `OMP`, the footer selector follows `OMP_MAIN`. Rebuild when it moves or a set is added. To offer an open PR's footer, add `{ key, env, label, title }` to `FOOTER_CHOICES` and a checkout of its branch in that variable.
 
 The engine is [pocket-synth](https://github.com/Provable-Games/pocket-synth). onchain-midi-player pins an exact signed release of it, so the sound check follows pocket-synth only through onchain-midi-player.
 
@@ -68,9 +69,8 @@ The engine is [pocket-synth](https://github.com/Provable-Games/pocket-synth). on
    git -C /workspace/beasts-v3 fetch -q origin
    git -C /workspace/beasts-v3 worktree add --detach /workspace/beasts-v3-worktrees/sound-check origin/main
 
-   # the page footers (no install needed)
+   # the upstream page footer (no install needed)
    git -C /workspace/onchain-midi-player worktree add --detach /workspace/onchain-midi-player-worktrees/sound-check-footer-main origin/main
-   git -C /workspace/onchain-midi-player worktree add --detach /workspace/onchain-midi-player-worktrees/sound-check-footer-pr88 origin/feat/pause-freezes-img-art
    ```
 
 3. **Build** from this repo, on an up-to-date `main`:
@@ -82,7 +82,6 @@ The engine is [pocket-synth](https://github.com/Provable-Games/pocket-synth). on
    export BEAST=/workspace/midi_fun_contract-worktrees/sound-check
    export BEASTS3=/workspace/beasts-v3-worktrees/sound-check
    export OMP_MAIN=/workspace/onchain-midi-player-worktrees/sound-check-footer-main
-   export OMP_PR88=/workspace/onchain-midi-player-worktrees/sound-check-footer-pr88
    PLAYER=$(sed -n 's/^export const VERSION = "\([^"]*\)".*/\1/p' $OMP/scripts/segments.mjs)
    ENGINE=$(sed -n 's/^export const ENGINE_PIN = { ref: "\([^"]*\)".*/\1/p' $OMP/scripts/engine.mjs)
    export OMP_LABEL="origin/main $(git -C $OMP rev-parse --short HEAD) (player $PLAYER, pocket-synth $ENGINE)"
@@ -95,7 +94,7 @@ The engine is [pocket-synth](https://github.com/Provable-Games/pocket-synth). on
 
    If the player `VERSION` changed and you want to A/B against the outgoing page, run `mkdir -p old && cp index.html old/index.html` before building, which serves the outgoing page at `/old/`. Saved results are stored per player version, so a new version starts with a clean sheet.
 
-   `/old/` is built with the same tools from an older player, so a change to this site's tools (the engine test, say) needs both pages rebuilt. It was last built before section 1 became the real Beasts, and nothing in it depends on them; rebuilding it with today's tools gives it the same section 1 (which plays the deployed pages, whatever `OMP` is) and needs `OMP_MAIN` and `OMP_PR88` too. Make a second onchain-midi-player worktree at the old commit (`8b1ff66`, player 0.7.0, pocket-synth v2.0.1), run `gen_tracks.mjs` with that as `OMP` and `OMP_LABEL="origin/main before #85 8b1ff66 (player 0.7.0, pocket-synth v2.0.1)"`, build it with `OUT=$PWD/old/index.html node tools/build_site.mjs`, then build the main page as above. Rebuilding either from unchanged sources changes only the `generated` time in its data.
+   `/old/` is built with the same tools from an older player, so a change to this site's tools (the engine test, say) needs both pages rebuilt. It was last built before section 1 became the real Beasts, and nothing in it depends on them; rebuilding it with today's tools gives it the same section 1 (which plays the deployed pages, whatever `OMP` is) and needs `OMP_MAIN` too. Make a second onchain-midi-player worktree at the old commit (`8b1ff66`, player 0.7.0, pocket-synth v2.0.1), run `gen_tracks.mjs` with that as `OMP` and `OMP_LABEL="origin/main before #85 8b1ff66 (player 0.7.0, pocket-synth v2.0.1)"`, build it with `OUT=$PWD/old/index.html node tools/build_site.mjs`, then build the main page as above. Rebuilding either from unchanged sources changes only the `generated` time in its data.
 
 4. **Smoke-test** in Chromium and WebKit at phone size. Expect every check to pass in both:
 
@@ -107,7 +106,9 @@ The engine is [pocket-synth](https://github.com/Provable-Games/pocket-synth). on
    It serves the site on 127.0.0.1 itself (a `file://` page cannot fetch the set, and `crypto.subtle` needs a secure context). `BEASTS3` is optional: with it, each real Beast's GIF is also checked against its canonical genesis file. `SHOTS=<dir>` saves phone-width screenshots of the picker and the footer banner, light and dark; `PLAYWRIGHT_EXECUTABLE` overrides the browser's launcher. The browsers need their system libraries; `npx playwright install-deps` installs them where you have root. The test covers:
 
    - real Beasts: each variant (Genesis, presets 0 to 3) loads byte-identical to the `animation_url` Node rebuilds from the set, plays, has the notes fragment only on Genesis and presets 2 and 3, and shows its Shiny or Regular GIF; the facts; a SHA-256 mismatch refuses to play; a page without `crypto.subtle` says why
-   - the page footer: as deployed is the rebuilt page and its GIF keeps moving while paused; the PR #88 footer is spliced in, shows the banner, freezes the art on pause (no change over 2 s) and animates after resume; upstream main plays; the choice and a rating persist across a reload; the export records set, block, token ID, name, preset and footer with its commit
+   - the page footer: as deployed is the rebuilt page, its GIF keeps moving while paused and the speed row is off; upstream main is spliced in byte for byte at the shipped step, shows the banner, freezes the art on pause (no change over 2 s) and animates after resume
+   - the retimed GIF's speed: the GIF's frame period measured at the shipped step, Medium and Slow (the slope of its changes against the beat grid, from screenshots timed by the audible music position as in upstream's `page_check`; the median of the pairwise slopes, because headless WebKit adds misplaced changes for a GIF inside an SVG image), and the footer's policy replaced exactly once at the other steps
+   - the choice, the speed and a rating persist across a reload; a saved footer that is gone falls back to As deployed; the export records set, block, token ID, name, preset, footer with its commit and speed
 
    - every engine-test section's tracks, with background audio and media metadata
    - play-button placement, size settings and touch target
