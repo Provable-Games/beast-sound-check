@@ -20,7 +20,10 @@
 // `frameUs` (an eighth note, or a quarter note above 150 BPM): built and minified, `<f>=<b>=><b>/2<2e5?<b>:Math.round(<b>/2)`.
 // Such a footer is marked `retimes`, and the page's Animation speed row can drive it: a step other than the shipped
 // one replaces that one expression (it must occur exactly once, here and in the page) with `<f>=<b>=>Math.round(<b>*q)`,
-// q quarter notes per frame. A footer without it is offered as it is, with the speed row off.
+// q quarter notes per frame. A footer without it is offered as it is, with the speed row off. The deployed footer is
+// treated the same way: since beasts-v3 #247 it retimes, so As deployed drives the speed row too, and only a step
+// other than the shipped one changes the deployed page. A deployed footer that differs from onchain-midi-player's file
+// at its manifest's source revision is accepted only when the manifest declares the difference (`localAdaptation`).
 import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -56,7 +59,8 @@ const footers = (() => {
   const pm = JSON.parse(fs.readFileSync(path.join(B3, "assets/player-page/manifest.json"), "utf8"));
   const deployed = fs.readFileSync(path.join(B3, pm.fragments.footer.path), "utf8");
   if (sha256(deployed) !== pm.fragments.footer.sha256 || Buffer.byteLength(deployed) !== pm.fragments.footer.bytes) throw new Error("beasts-v3's vendored footer differs from its manifest");
-  if (git(need(FOOTER_CHOICES[0].env), "show", `${pm.source.revision}:${FOOTER}`) !== deployed) throw new Error(`beasts-v3's vendored footer differs from onchain-midi-player ${pm.source.revision}'s`);
+  const adapted = git(need(FOOTER_CHOICES[0].env), "show", `${pm.source.revision}:${FOOTER}`) !== deployed;
+  if (adapted && !pm.source.localAdaptation) throw new Error(`beasts-v3's vendored footer differs from onchain-midi-player ${pm.source.revision}'s, and its manifest declares no localAdaptation`);
   const at = (dir, label, title) => {
     const commit = git(dir, "rev-parse", "HEAD").trim(), text = fs.readFileSync(path.join(dir, FOOTER), "utf8");
     if (git(dir, "status", "--porcelain", "--", FOOTER).trim()) throw new Error(`${dir}: ${FOOTER} has local changes`);
@@ -66,8 +70,9 @@ const footers = (() => {
     if (policies > 1) throw new Error(`${dir}: ${FOOTER} has ${policies} frame-length policies; the speed override needs exactly one`);
     return { label, title, commit, sha256: sha256(text), bytes: Buffer.byteLength(text), text, retimes: policies === 1, sameAsEngineTests: text === data.fixed.footer };
   };
-  const out = { deployed: { label: "As deployed", title: `Beasts' vendored footer, onchain-midi-player ${pm.source.revision.slice(0, 7)}`, commit: pm.source.revision, sha256: pm.fragments.footer.sha256, bytes: pm.fragments.footer.bytes, text: deployed, retimes: false } };
-  if (new RegExp(POLICY).test(deployed)) throw new Error("the deployed footer retimes its GIF: the speed row's As deployed reason needs revisiting");
+  const deployedPolicies = (deployed.match(new RegExp(POLICY, "g")) || []).length;
+  if (deployedPolicies > 1) throw new Error(`beasts-v3's vendored footer has ${deployedPolicies} frame-length policies; the speed override needs exactly one`);
+  const out = { deployed: { label: "As deployed", title: `Beasts' vendored footer, onchain-midi-player ${pm.source.revision.slice(0, 7)}${adapted ? " with Beasts' local adaptation" : ""}`, commit: pm.source.revision, sha256: pm.fragments.footer.sha256, bytes: pm.fragments.footer.bytes, text: deployed, retimes: deployedPolicies === 1, adaptation: adapted ? pm.source.localAdaptation : "" } };
   for (const c of FOOTER_CHOICES) out[c.key] = at(need(c.env), c.label, c.title);
   return out;
 })();
@@ -297,7 +302,7 @@ ${BANNER}
   <label><input type="checkbox" data-g="silent"><span><b>iPhone silent switch.</b> Flip the side switch to silent and play a track. Note whether you hear it (Web Audio on iOS often follows the switch). Flip it back before testing.</span></label>
   <label><input type="checkbox" data-g="headphones"><span><b>Headphones, then Bluetooth.</b> Plug in wired headphones mid-track, then connect Bluetooth. Playback should carry on or resume without crackle. Note the Bluetooth delay between the art and the sound.</span></label>
   <label><input type="checkbox" data-g="background"><span><b>Background the tab and return.</b> Play, switch to another app or tab for 10 seconds, come back. Note whether the audio kept playing while hidden. On return, the play/pause button must match what you hear, and playback must have no glitch.</span></label>
-  <label><input type="checkbox" data-g="pause"><span><b>Pause and resume.</b> Tap pause while a dense track plays. All sound must stop at once (no stuck notes). Tap play: the music carries on from the same point. The art: on a real Beast as deployed, the GIF keeps moving while the music is paused (an isolated image runs on its own clock); with the Pause-freeze PR footer it holds still and moves again on play. On an engine test, the Synced art freezes on the frame you last heard and moves again in step with the music.</span></label>${BGBLOCK}
+  <label><input type="checkbox" data-g="pause"><span><b>Pause and resume.</b> Tap pause while a dense track plays. All sound must stop at once (no stuck notes). Tap play: the music carries on from the same point. The art: on a real Beast, the GIF holds still while the music is paused and moves again on play (the deployed footer freezes and retimes it, as upstream's does). On an engine test, the Synced art freezes on the frame you last heard and moves again in step with the music.</span></label>${BGBLOCK}
 </details>
 
 <section class="card" id="sepolia" aria-labelledby="sephd">
@@ -558,9 +563,10 @@ function animationPage(uri) {
 // fillers of nine spaces) between the segments: the footer is the last fragment, so another footer replaces exactly the
 // deployed one's bytes at the end. Anything else (no deployed footer, two of them, or one that is not last) refuses.
 function splice(html, k, tok) {
-  if (!k) return html;
+  // As deployed, the page is untouched unless its retiming footer plays at a step other than the shipped one
+  if (!k) { var s0 = realStep(tok); if (!s0 || s0 === shippedSpeed(tokArt(tok))) return html; }
   var dep = FT.deployed.text, i = html.indexOf(dep);
-  if (i < 0 || html.lastIndexOf(dep) !== i || i + dep.length !== html.length) throw new Error("this page does not end with the deployed footer (" + FT.deployed.title + ") exactly once, so the " + FT[k].label + " footer was not spliced in");
+  if (i < 0 || html.lastIndexOf(dep) !== i || i + dep.length !== html.length) throw new Error("this page does not end with the deployed footer (" + FT.deployed.title + ") exactly once, so the " + ftOf(k).label + " footer was not spliced in");
   return html.slice(0, i) + footerText(k, tok);
 }
 // ---- The Animation speed row on real Beasts. A footer that retimes the GIF (FT[k].retimes, onchain-midi-player #93)
@@ -570,7 +576,7 @@ function splice(html, k, tok) {
 // frame. It must occur exactly once (the build checks it too), or the page refuses. The shipped step leaves the footer
 // as it is. A GIF frame shows at least 2 cs (browsers show 0 and 1 cs as 10, and the retimer never writes under 2), so
 // a step whose frame would be under 20 ms at this tempo is off.
-function retimes(k) { return !!(k && FT[k] && FT[k].retimes); }
+function retimes(k) { var f = ftOf(k); return !!(f && f.retimes); }
 function firstRetimer() { for (var i = 1; i < FTKEYS.length; i++) if (retimes(FTKEYS[i])) return FT[FTKEYS[i]]; return null; }
 function tokArt(tok) { return { tempoUs: tok.tempo.microsecondsPerQuarter }; }
 var MIN_FRAME_US = 20000;
@@ -583,7 +589,7 @@ function realSpeedText(tok) {
   return "retimed GIF " + SPEEDS[k].label + ", one frame per " + SPEEDS[k].note + ", " + msAt(a, k) + (k === ship ? " (shipped)" : " (shipped: " + SPEEDS[ship].note + ")");
 }
 function footerText(k, tok) {
-  var f = FT[k], s = realStep(tok);
+  var f = ftOf(k), s = realStep(tok);
   if (!f.retimes || !s || s === shippedSpeed(tokArt(tok))) return f.text;
   var re = new RegExp(SEPD.policy, "g"), n = (f.text.match(re) || []).length;
   if (n !== 1) throw new Error("the " + f.label + " footer's frame-length policy (an eighth note, or a quarter note above 150 BPM) occurs " + n + " times, not once, so the " + SPEEDS[s].label + " speed was not applied");
@@ -608,7 +614,7 @@ function pageGif(html) {
 }
 
 var nSongs = T.filter(function (t) { return t.sectionId === "6"; }).length, nEng = T.length - nSongs;
-$("intro").textContent = "Two parts. Section 1, Beasts on Sepolia: real Beasts, each the exact animation_url page of a token on the latest Beasts V3 Sepolia deployment (TinySynth " + SEPD.sets[0].tinysynth + ", the Beasts renderer's card, the Originals Sound Manager's music), rebuilt from a stored rendition set and checked against its SHA-256 before it plays. Pick a species and a variant: its Genesis Beast or presets 0 to 3. Their art is the card's GIF as an isolated image, on its own clock as deployed; a retiming page footer (" + ((firstRetimer() || {}).label || "none") + ") plays it on the music's beat, and the Animation speed row then tunes how many notes each GIF frame lasts. Then " + nEng + " engine tests (sections 2 to 5): synthetic tracks on onchain-midi-player " + D.meta.playerVersion + "'s reference Beast page, which test the engine, not shipping Beasts: their cards are templates and their inline Synced art (a sprite sheet stepped on the beat and seeked to the music) follows the music; switch to the original GIF to compare, and Animation speed sets how many notes each Synced frame lasts (by default as shipped: an eighth note, or a quarter note above 150 BPM). " + (nSongs ? "Section 6 has the " + nSongs + " Species Songs of Casey's branch (" + (D.meta || {}).songsCommit + "), one per original species, on the same reference page: the song every original of that species plays by default, with its own Beast's original GIF as the art. " : "") + "Each track plays in a sandboxed frame, as on a marketplace. Results are saved on this device.";
+$("intro").textContent = "Two parts. Section 1, Beasts on Sepolia: real Beasts, each the exact animation_url page of a token on the latest Beasts V3 Sepolia deployment (TinySynth " + SEPD.sets[0].tinysynth + ", the Beasts renderer's card, the Originals Sound Manager's music), rebuilt from a stored rendition set and checked against its SHA-256 before it plays. Pick a species and a variant: its Genesis Beast or presets 0 to 3. Their art is the card's GIF as an isolated image, which the page footer " + (FT.deployed.retimes ? "(as deployed, or " + ((firstRetimer() || {}).label || "another") + ")" : "(" + ((firstRetimer() || {}).label || "none") + ")") + " plays on the music's beat; the Animation speed row tunes how many notes each GIF frame lasts. Then " + nEng + " engine tests (sections 2 to 5): synthetic tracks on onchain-midi-player " + D.meta.playerVersion + "'s reference Beast page, which test the engine, not shipping Beasts: their cards are templates and their inline Synced art (a sprite sheet stepped on the beat and seeked to the music) follows the music; switch to the original GIF to compare, and Animation speed sets how many notes each Synced frame lasts (by default as shipped: an eighth note, or a quarter note above 150 BPM). " + (nSongs ? "Section 6 has the " + nSongs + " Species Songs of Casey's branch (" + (D.meta || {}).songsCommit + "), one per original species, on the same reference page: the song every original of that species plays by default, with its own Beast's original GIF as the art. " : "") + "Each track plays in a sandboxed frame, as on a marketplace. Results are saved on this device.";
 var meta = D.meta || {};
 $("foot").textContent = "Beasts on Sepolia: " + SEPD.sets.map(function (s) { return s.dir + " (block " + s.blockNumber + ", " + s.tokens + " tokens)"; }).join(", ") + ". Page footers: " + FTKEYS.map(function (k) { return ftOf(k).label + ", onchain-midi-player " + short(ftOf(k).commit) + (k ? "" : " (Beasts' vendored copy)"); }).join("; ") + ". Engine tests: player " + meta.playerVersion + ", " + (meta.beastCommit || "") + ", " + (meta.ompCommit || "") + (meta.songsCommit ? ". Species Songs: midi_fun_contract " + meta.songsCommit : "") + ". Generated " + (meta.generated || "").slice(0, 10) + ".";
 $("sepintro").textContent = "Real Beasts read from the latest Beasts V3 Sepolia deployment at one block: one Beast for each of the 75 original species at visual presets 0 to 3 (sound effects equal to the preset) and the 75 Genesis Beasts. The set is stored in this site's renditions/ folder and fetched when the page opens; each token_uri is rebuilt from it and checked against its SHA-256 before it plays, and a Beast that fails the check is not played.";
@@ -812,7 +818,7 @@ function realChecks(tok) {
   c.push("Art: the " + (tok.shiny ? "Shiny" : "Regular") + " GIF of the " + tok.species + " in the card's art frame, an isolated image (not inline SVG). " + (st ? "This footer retimes it to the music: one frame per " + SPEEDS[st].note + " (" + msAt(a, st) + "), each change on the beat, and it stays in step to the end of the pass." : "It runs on its own clock and is not stepped to the music."));
   c.push(tok.rainbow ? "Rainbow: the card's rim and logo cycle through rainbow colours." : "No rainbow: the card's rim and logo are plain.");
   c.push(tok.notes ? "Notes: the song's own MIDI scrolls right to left behind the Beast in the art frame, one colour per channel, drums as ticks along the bottom; each note sounds as it reaches the playhead near the left edge. They stand still before play, freeze on pause, and loop with the music." : "No notes behind the Beast: presets 0 and 1 draw none.");
-  c.push(retimes(k) ? "Pause, with the " + FT[k].label + " footer: all sound stops at once (no stuck notes) and the GIF holds still; play carries the music on from the same point and the GIF moves again from the frame the music is on." :
+  c.push(retimes(k) ? "Pause, " + (k ? "with the " + FT[k].label + " footer" : "as deployed") + ": all sound stops at once (no stuck notes) and the GIF holds still; play carries the music on from the same point and the GIF moves again from the frame the music is on." :
     "Pause, " + (k ? "with the " + FT[k].label + " footer" : "as deployed") + ": all sound stops at once (no stuck notes), but the GIF keeps moving: this footer cannot pause an isolated image. Play carries the music on from the same point." + (r ? " Choose the " + r.label + " footer to compare." : ""));
   c.push("Let it loop at least once: no gap and no click at the seam, and the play button still matches what you hear.");
   return c;
@@ -820,11 +826,12 @@ function realChecks(tok) {
 function paintFooter() {
   var k = store.ft, f = ftOf(k), b = $("ftbadge");
   $("ftsel").value = k;
-  b.hidden = !(cur && k);
   var st = cur ? realStep(cur.tok) : "", off = !!st && st !== shippedSpeed(tokArt(cur.tok));
-  b.textContent = k ? "Page footer: " + f.label + " (" + f.title + " " + short(f.commit) + "), not the deployed page." + (off ? " Animation speed: " + SPEEDS[st].label + " (one GIF frame per " + SPEEDS[st].note + "), not the shipped speed." : "") : "";
+  b.hidden = !(cur && (k || off));
+  var offText = off ? "Animation speed: " + SPEEDS[st].label + " (one GIF frame per " + SPEEDS[st].note + "), not the shipped speed." : "";
+  b.textContent = k ? "Page footer: " + f.label + " (" + f.title + " " + short(f.commit) + "), not the deployed page." + (off ? " " + offText : "") : offText;
   $("ftinfo").textContent = k ? "This Beast's page with its footer (the bootstrap script: play button, art, notes, background audio and media session) replaced by " + f.title + " " + short(f.commit) + "'s examples/beast_consumer/fixtures/footer.html; everything before it is the real page." + (f.sameAsEngineTests ? " It is the footer the engine tests' reference page runs." : "") + (f.retimes ? " It freezes the isolated GIF while the music is paused and retimes it to the music's beat; the Animation speed row below tunes that." : "") :
-    "The page exactly as the token_uri carries it, with Beasts' vendored footer (onchain-midi-player " + short(FT.deployed.commit) + ").";
+    "The page exactly as the token_uri carries it, with Beasts' vendored footer (onchain-midi-player " + short(FT.deployed.commit) + (FT.deployed.adaptation ? ", with Beasts' local adaptation" : "") + ")." + (FT.deployed.adaptation ? " The adaptation: " + FT.deployed.adaptation : "") + (FT.deployed.retimes ? " It freezes the isolated GIF while the music is paused and retimes it to the music's beat; the Animation speed row below tunes that, and any step but the shipped one changes the page." : "");
 }
 function paintFacts(tok) {
   var dl = $("facts"), tp = tok.tempo || {}, m = SEP.set.manifest; dl.textContent = "";
