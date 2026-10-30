@@ -500,15 +500,15 @@ await page.uncheck("#cardSync");
   const svgOf = (html) => { const m = /id="beast-art"[^>]*src="data:image\/svg\+xml;base64,([^"]+)"/.exec(html); return m ? Buffer.from(m[1], "base64").toString("latin1") : null; };
   const others = (svg) => (svg.match(/<animate(Transform)? [^>]*>/g) || []).filter((x) => !SPRITE.test(x));
   const byLabel = (l) => D.tracks.find((t) => t.sectionId + "." + t.id.slice(1) === l);
-  // every animated track: the built Synced pages (with and without card sync) carry the shipped step's dur, and the policy
-  // agrees with the frame length gen_tracks recorded
+  // every animated track with Synced pages (section 6 has the original GIF only): the built Synced pages (with and without
+  // card sync) carry the shipped step's dur, and the policy agrees with the frame length gen_tracks recorded
   const bad = [];
-  for (const t of D.tracks) {
-    if (!t.art.animated) continue;
+  const synced = D.tracks.filter((t) => t.art.animated && t.pages.length === 3);
+  for (const t of synced) {
     for (const v of [1, 2]) { const d = (SPRITE.exec(svgOf(t.pages[v].art)) || [])[1]; if (d !== want(t.art, shipped(t.art))) bad.push(`${t.id}/${v}: ${d} vs ${want(t.art, shipped(t.art))}`); }
     if (+(Math.round(t.art.tempoUs * Q[shipped(t.art)]) / 1000).toFixed(1) !== t.art.frameMs) bad.push(`${t.id}: frameMs ${t.art.frameMs}`);
   }
-  ok("shipped step reproduces every built Synced dur", bad.length === 0, bad.length ? bad.slice(0, 3).join("; ") : `${D.tracks.filter((t) => t.art.animated).length} animated tracks x 2 variants`);
+  ok("shipped step reproduces every built Synced dur", bad.length === 0, bad.length ? bad.slice(0, 3).join("; ") : `${synced.length} animated tracks x 2 variants`);
   const open = (l) => page.evaluate((l) => { const b = Array.from(document.querySelectorAll(".trk")).find((x) => x.querySelector(".id").textContent === l); b.closest("details").open = true; b.click(); }, l);
   const srcdoc = () => page.evaluate(() => document.querySelector("#pw iframe").srcdoc);
   const pressed = () => page.evaluate(() => Array.from(document.querySelectorAll("[data-speed]")).filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.getAttribute("data-speed")).join(","));

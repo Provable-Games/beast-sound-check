@@ -10,6 +10,9 @@
 //         Run installs in worktrees, never in someone's working checkout.
 // BEASTS3 a beasts-v3 checkout for the card template and genesis GIFs (art.mjs).
 // OMP_LABEL / BEAST_LABEL name those commits in the page's footer.
+// BEAST_SONGS (optional) a midi_fun_contract checkout of Casey's branch whose Species Songs section 6 plays (the branch beast-editions at
+//         the time of writing), with `npm install` in offchain/beast-sound; BEAST_SONGS_LABEL names the branch and commit. Without it
+//         there is no section 6.
 //
 // Every page is the complete NFT-owned document of onchain-midi-player's reference Beast consumer
 // (examples/beast_consumer: scripts/composition.mjs consumerPieces with the example's ALIGN options):
@@ -36,6 +39,13 @@ const SF = await imp(OMP + "/scripts/settings_fixtures.mjs");
 const RW = await imp(OMP + "/scripts/reference_waves.mjs");
 const SS = await imp(BS + "/onchain/tinychip/synth_settings.mjs");
 const ES = await imp(BS + "/onchain/tinychip/essentials.mjs");
+// Casey's branch for section 6 (its own copy of beast-sound: engine, lab, settings generator)
+const BEAST_SONGS = process.env.BEAST_SONGS || "";
+const SONGS = BEAST_SONGS && {
+  label: need("BEAST_SONGS_LABEL"),
+  idx: await imp(BEAST_SONGS + "/offchain/beast-sound/src/index.js"), v11: await imp(BEAST_SONGS + "/offchain/beast-sound/src/engine_v11.js"),
+  lab: await imp(BEAST_SONGS + "/offchain/beast-sound/src/lab.js"), ss: await imp(BEAST_SONGS + "/offchain/beast-sound/onchain/tinychip/synth_settings.mjs"),
+};
 
 import * as ART from "./art.mjs";
 const { TABLES } = await imp(BS + "/src/index.js");
@@ -139,13 +149,13 @@ function nextArt(prefN) {
 // Tracks are specified first (the Beast art is allocated in call order) and built at the end, so that the
 // music of two tracks can be swapped without touching their art or position (SWAP below).
 const specs = [];
-function add({ section, title, blurb, checks, settings, midi, beast: beastIn, strings: stringsIn, pref }) {
+function add({ section, title, blurb, checks, settings, midi, beast: beastIn, strings: stringsIn, pref, lean }) {
   const id = `${section[0]}${String(specs.filter((t) => t.section[0] === section[0]).length + 1).padStart(2, "0")}`;
   const pick = beastIn ? { beast: beastIn, shiny: !!beastIn.shiny } : nextArt(pref);
-  specs.push({ id, section, title, blurb, checks, settings, midi, pick, stringsIn });
+  specs.push({ id, section, title, blurb, checks, settings, midi, pick, stringsIn, lean });
   return id;
 }
-function build({ id, section, title, blurb, checks, settings, midi, pick, stringsIn }) {
+function build({ id, section, title, blurb, checks, settings, midi, pick, stringsIn, lean }) {
   const beast = pick.beast || cardBeast(pick.id, pick.shiny, {}, pick.animated !== false);
   const art = ART.speciesArt(beast.id, !!beast.shiny, beast.animated !== 0);
   const tempoUs = ART.midiTempoUs(midi), bpm = 60e6 / tempoUs;
@@ -154,8 +164,9 @@ function build({ id, section, title, blurb, checks, settings, midi, pick, string
   const strings = stringsIn || { name: TABLES.species[beast.id - 1], type: TYPE_NAMES[beast.beast_type], prefix: TABLES.prefixes[beast.prefix - 1], suffix: TABLES.suffixes[beast.suffix - 1] };
   if (!stringsIn) title = `${title} \u00b7 ${bpmText}`;
   usedArt.push({ id: beast.id, shiny: !!beast.shiny, track: id });
-  const variants = [["gif", false], ["synced", false], ["synced", true]].map(([mode, cardSync]) => ART.card({ beast, art, tempoUs, mode, cardSync, strings, mediaTitle: `${title} (${strings.name})` }));
-  const anchor = (/data-play-anchor="([^"]*)"/.exec(variants[1]) || [])[1];
+  // lean: the original GIF only (one page, not three), for a section of many tracks; its title already names the Beast
+  const variants = (lean ? [["gif", false]] : [["gif", false], ["synced", false], ["synced", true]]).map(([mode, cardSync]) => ART.card({ beast, art, tempoUs, mode, cardSync, strings, mediaTitle: lean ? title : `${title} (${strings.name})` }));
+  const anchor = (/data-play-anchor="([^"]*)"/.exec(variants[lean ? 0 : 1]) || [])[1];
   if (!anchor || (playAnchor && anchor !== playAnchor)) throw new Error(`${title}: the art's data-play-anchor differs between tracks`);
   playAnchor = anchor;
   const { d, settings_len } = SEG.dFragment(midi, settings);
@@ -165,18 +176,19 @@ function build({ id, section, title, blurb, checks, settings, midi, pick, string
     if (p.d !== d) throw new Error(`${title}: data fragment differs`);
     // what a marketplace decodes from the spliced token_uri must be the composed document
     if (!SEG.decodeTokenUri(p.uri).htmlBytes.equals(Buffer.from(p.html, "utf8"))) throw new Error(`${title}: token_uri round trip differs from the composed page`);
-    if (vi === 1) {
+    if (vi === (lean ? 0 : 1)) {
       const r = validateTokenUri({ uri: p.uri });
       const fails = r.checks.filter((c) => c.level === "fail");
       if (fails.length) throw new Error(`${title}: validate_token_uri: ` + fails.map((c) => `${c.id}: ${c.message}`).join("; "));
       for (const c of r.checks) if (c.level === "warn" && !/attributes/.test(c.id)) warn.push(`${id} ${c.id}: ${c.message}`);
     }
-    return splitPage(p.html, p.art, d, title);
+    const sp = splitPage(p.html, p.art, d, title);
+    return lean ? { ...sp, ...cutFont(sp.art) } : sp;
   });
   const fl = ART.frameUs(art.n, tempoUs);
   const sub = tempoUs / 2 < 200000 ? "quarter note (the eighth would be under 0.2 s)" : "eighth note";
   const notesCheck = "Notes: the song's own MIDI scrolls right to left behind the Beast in the art frame, one colour per channel, drums as ticks along the bottom; each note sounds as it reaches the playhead near the left edge. They stand still before play, freeze on pause, and loop with the music.";
-  const artChecks = !art.animated ? [notesCheck, `Static Beast: ${strings.name}, ${beast.shiny ? "shiny" : "regular"} (the genesis PNG, no animation). The art buttons all show the same picture.`] : [notesCheck,
+  const artChecks = lean ? [notesCheck, `Art: the ${strings.name}'s ${beast.shiny ? "shiny" : "regular"} genesis GIF (${art.n} frames), an isolated image in the card's art frame on its own clock; this section has no Synced variant (one art variant keeps the page small).`] : !art.animated ? [notesCheck, `Static Beast: ${strings.name}, ${beast.shiny ? "shiny" : "regular"} (the genesis PNG, no animation). The art buttons all show the same picture.`] : [notesCheck,
     `At the shipped animation speed, art frames flip on the eighth notes (quarter notes above 150 BPM); the Animation speed row tries others. Synced art, the default: ${strings.name}, ${beast.shiny ? "shiny" : "regular"}, ${art.n} frames, one per ${sub} at ${bpm.toFixed(2)} BPM (${(fl / 1000).toFixed(1)} ms); ${art.n === 5 ? "5 frames cycle every 5 steps and realign only at the loop; " : art.n === 3 || art.n === 6 ? "the " + art.n + "-frame cycle does not divide a bar, so a downbeat falls on different frames within a pass; " : ""}no drift to the end of the pass.`,
     `The art snaps cleanly at each loop and looks identical to the GIF apart from timing. Tap "Original GIF" above to compare (its frames run at the GIF's own 0.2 s and slide against the music).${art.delays.some((x) => x !== art.delays[0]) ? " This species' GIF has uneven frame delays (" + art.delays.map((x) => x * 10).join("/") + " ms); the sprite uses regular frames." : ""}`,
   ];
@@ -189,6 +201,25 @@ function build({ id, section, title, blurb, checks, settings, midi, pick, string
     d, pages,
   });
   return id;
+}
+// A lean track (one art variant: section 6) keeps its art with the card's embedded font cut out. The font is the same in
+// every card (14.7 KB of base64 inside the SVG, which is base64 itself inside the art) but sits at one of three alignments of
+// the outer base64, so `fonts` holds the three runs once and a page stores [position, alignment]; build_site.mjs puts it back
+// by concatenation. It is most of a card's bytes and does not compress (gzip's window is smaller than a track), so this keeps
+// 75 more tracks from adding about 1.2 MB to the download.
+const FONTS = {};
+function cutFont(art) {
+  const m = /src="data:image\/svg\+xml;base64,([^"]+)"/.exec(art), at = m.index + 'src="data:image/svg+xml;base64,'.length;
+  const buf = Buffer.from(m[1], "base64"), key = Buffer.from("font/woff2;base64,"), s0 = buf.indexOf(key) + key.length;
+  if (s0 < key.length || buf.indexOf(key, s0) >= 0) throw new Error("the card does not embed exactly one font");
+  const L = buf.indexOf(0x27, s0) - s0, k = Math.ceil(s0 / 3) * 3, shift = k - s0, n = Math.floor((L - shift) / 3) * 3;
+  const run = buf.subarray(k, k + n).toString("base64"), pos = at + (k / 3) * 4;
+  if (art.slice(pos, pos + run.length) !== run) throw new Error("the font run is not where its alignment says");
+  if (FONTS[shift] !== undefined && FONTS[shift] !== run) throw new Error("the card's font differs between tracks");
+  FONTS[shift] = run;
+  const cut = { art: art.slice(0, pos) + art.slice(pos + run.length), f: [pos, shift] };
+  if (cut.art.slice(0, pos) + FONTS[shift] + cut.art.slice(pos) !== art) throw new Error("the cut font does not restore the art");
+  return cut;
 }
 // The composed page is FIXED.head ++ ws ++ FIXED.gunzip ++ ws ++ FIXED.player ++ FIXED.body ++ art ++ D ++ ws
 // ++ FIXED.notes ++ ws ++ FIXED.footer, where each ws is the alignment whitespace consumerPieces adds (it depends
@@ -216,6 +247,7 @@ function splitPage(html, art, d, title) {
 }
 
 const SEC = { preset: "2 TinyChip presets", drum: "3 Drums", edge: "4 General range and edge cases", bank: "5 Client chip bank (not onchain)" };
+if (SONGS) SEC.songs = `6 Original species songs (Casey's branch ${SONGS.label})`;
 
 // =============================================================================================
 // Section 1 is the real Beasts (Beasts on Sepolia), which the page reads from renditions/ at run time; it has no
@@ -869,6 +901,43 @@ for (const [cat, ids] of Object.entries(cats)) {
   });
 }
 
+// =============================================================================================
+// 6. Original species songs (Casey's branch, BEAST_SONGS): the Species Song of each of the 75 original species, as
+// the Originals Sound Manager publishes it. The manager stores, for each species, the Genesis Track of genesis_swap(id)
+// as ComposerInputs::Song(get_generation_inputs({ composition_seed: 0 }, 0, { species_id: genesis_swap(id), name 0, ... })
+// .base_song) and plays compose(inputs, sound_effects) with the token's sound effects. Here: sound effects 0 (as
+// written: not mega, no echo, no drift) for the regular Beast. The notes are lab.js genesisMidi(id, false), which the
+// branch's parity scripts hold byte-identical to its Cairo; the settings are synth_settings.mjs's family settings
+// (the Yeti's for species 68), hashed against the Cairo constants. Each track is the species' own unnamed Beast
+// (level 50, health 200, as the song composes it) with the original GIF only (lean: one page, not three).
+// =============================================================================================
+if (SONGS) {
+  const { idx: SI, v11: SV, lab: SL, ss: SSS } = SONGS;
+  const E6 = SI.engine, V6 = SV.createEngineV11(E6);
+  const FAMILY = ["Magic", "Hunter", "Brute"];
+  for (let id = 1; id <= 75; id++) {
+    const swap = SL.GENESIS_SWAPS[id] || id; // Harpy (39) and Pegasus (40) publish each other's Genesis Track
+    const type = SL.speciesType(swap), tier = SL.speciesTier(swap), yeti = swap === 68;
+    const { midi, info } = SL.genesisMidi(id, false, E6, V6);
+    const settings = SSS.beastSynthSettings(undefined, SSS.variantPrograms({ type, mega: false, yeti }));
+    const name = TABLES.species[id - 1], partner = TABLES.species[swap - 1], bpm = +(60e6 / ART.midiTempoUs(midi)).toFixed(2);
+    const own = swap === id ? "" : `${name} plays ${partner}'s Genesis Track (the default swap of Harpy and Pegasus, as the Originals Sound Manager publishes it). `;
+    add({
+      lean: true, section: SEC.songs, title: swap === id ? name : `${name} (${partner}'s song)`,
+      blurb: `The Species Song of the ${name}: the track every ${name} plays by default (its Genesis Track), composed by Casey Wescott's branch ${SONGS.label}. ${own}${FAMILY[type]} family, tier ${tier}; ${info.key}, ${bpm} BPM, ${info.sections} sections, ${info.channels.length} channels. As written (sound effects 0): not mega, no echo, no drift.`,
+      checks: [
+        `Tap the round play button on the card: the music starts within about half a second, with no error text at the bottom of the player. It is the ${partner}'s Species Song in ${info.key} at ${bpm} BPM: ${info.sections} sections, then the loop.`,
+        `Voices: ${info.channels.join(", ")}. The sounds are the ${FAMILY[type]} family's TinyChip presets (three leads, three plucks)${yeti ? " and Pulse 12.5% Pluck, the Yeti's avalanche," : ""} and the chip drum kit, with reverb 30: the settings the contract returns for this song, not hand-picked presets.`,
+        ...(swap === id ? [] : [`${name} and ${partner} swap songs: the card shows the ${name}, the music is the ${partner}'s.`]),
+        ...(yeti ? ["The Yeti has its own arrangement: a rock tempo (175 BPM) with an avalanche on the pluck, not a canon like the other species."] : []),
+        "Let it loop at least once: no gap and no click at the seam, and the play button still matches what you hear.",
+      ],
+      settings, midi,
+      beast: cardBeast(id, false, { prefix: 0, suffix: 0, rank: 0, level: 50, health: 200 }, true),
+    });
+  }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Per-track Beast overrides (the user asked for these pairings; everything else about the track, its music,
 // description, checks and the synced frame length, follows its own MIDI): #301 (Drums, the rock groove) shows
@@ -882,11 +951,11 @@ for (const [id, pick] of Object.entries(BEAST_OVERRIDE)) {
 for (const sp of specs) build(sp);
 const meta = {
   generated: new Date().toISOString(), playerVersion: SEG.VERSION, fixedBytes: Object.values(FIXED).reduce((n, f) => n + f.length, 0),
-  beastCommit: need("BEAST_LABEL"), ompCommit: need("OMP_LABEL"),
+  beastCommit: need("BEAST_LABEL"), ompCommit: need("OMP_LABEL"), songsCommit: SONGS ? SONGS.label : "",
   bankFail, warn,
   usedArt, playAnchor,
 };
-fs.writeFileSync(path.join(here, "tracks.json"), JSON.stringify({ meta, fixed: FIXED, tracks }));
+fs.writeFileSync(path.join(here, "tracks.json"), JSON.stringify({ meta, fixed: FIXED, tracks, fonts: FONTS }));
 const counts = {};
 tracks.forEach((t) => { counts[t.section] = (counts[t.section] || 0) + 1; });
 console.log(counts, "total", tracks.length, "bankFail", bankFail, "warn", warn);

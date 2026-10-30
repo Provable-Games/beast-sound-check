@@ -1,10 +1,10 @@
 # Beast Sound Check
 
-A phone-first listening test for the onchain MIDI player ([onchain-midi-player](https://github.com/Provable-Games/onchain-midi-player)) in two parts: **real Beasts** from the latest Beasts V3 Sepolia deployment (section 1, "Beasts on Sepolia"), and **engine tests** on onchain-midi-player's reference Beast page (sections 2 to 5: every TinyChip preset and drum, edge cases, stress ramps and the client chip bank).
+A phone-first listening test for the onchain MIDI player ([onchain-midi-player](https://github.com/Provable-Games/onchain-midi-player)) in two parts: **real Beasts** from the latest Beasts V3 Sepolia deployment (section 1, "Beasts on Sepolia"), and **engine tests** on onchain-midi-player's reference Beast page (sections 2 to 5: every TinyChip preset and drum, edge cases, stress ramps and the client chip bank). Section 6 adds the **Species Songs** of Casey Wescott's midi_fun_contract branch, one track per original species.
 
 Open https://provable-games.github.io/beast-sound-check/ on your phone.
 
-The engine tests run player 0.8.0 (engine: [pocket-synth](https://github.com/Provable-Games/pocket-synth) v2.1.0, which asks phones and tablets for a larger audio buffer and a 1 s lookahead). For an A/B on the same device, https://provable-games.github.io/beast-sound-check/old/ is the same build from onchain-midi-player `8b1ff66`, just before the re-pin (player 0.7.0, engine v2.0.1), so the two differ only in the engine. (`/old/` predates section 1: it still has Casey's compositions on the reference page in its place.)
+The engine tests run player 0.8.0 (engine: [pocket-synth](https://github.com/Provable-Games/pocket-synth) v2.1.0, which asks phones and tablets for a larger audio buffer and a 1 s lookahead). For an A/B on the same device, https://provable-games.github.io/beast-sound-check/old/ is the same build from onchain-midi-player `8b1ff66`, just before the re-pin (player 0.7.0, engine v2.0.1), so the two differ only in the engine. (`/old/` predates section 1: it still has Casey's compositions on the reference page in its place. It has no section 6.)
 
 ## Section 1: Beasts on Sepolia
 
@@ -30,9 +30,19 @@ Each engine test is the complete `animation_url` page of onchain-midi-player's r
 
 Its art is the Beasts V3 card template as the renderer draws it (beasts-v3's renderer fixtures), with a species' genesis art; these are not real Beasts. The Beasts alternate shiny and regular, all animated (GIF), as every original is now (beasts-v3 #228 and #253, which removed the static PNG art); each also has a "Synced" variant: the GIF as a PNG sprite sheet stepped on the beat by SMIL, simulating [beasts-v3#132](https://github.com/Provable-Games/beasts-v3/issues/132). As shipped, a Synced frame lasts an eighth note, or a quarter note above 150 BPM (when an eighth would be under 0.2 s). The **Animation speed** row under the art (or `?speed=<step>` in the URL: `ultraslow`, `slow`, `medium`, `fast`, `ultrafast` or `shipped`) sets one note value per frame for every track: Ultra slow a whole note, Slow a half, Medium a quarter, Fast an eighth, Ultra fast a sixteenth. Until a step is chosen, each track follows the shipped policy (dashed), so the page is as built. The page retimes only the sprite's `<animate>` `dur` from the track's exact tempo (microseconds per quarter note), leaving the card-sync animations alone; the original GIF keeps its own clock as the baseline, and static Beasts have nothing to time. The info line shows the frame length at the chosen step, the shipped step and its frame length, and the GIF's own frame length. Exported results record the art and speed each track was rated with. Every card marks its art frame `data-notes-bg`, so every track draws its own MIDI as a piano roll scrolling behind the Beast ([beasts-v3#218](https://github.com/Provable-Games/beasts-v3/pull/218), onchain-midi-player's notes fragment); production Beasts draw notes only for visual presets 2 and 3. The play button sits at the art frame's top-right corner (`data-play-anchor="235 54 24 top-right"`).
 
+## Section 6: Original species songs
+
+Section 6 (tracks 6.01 to 6.75, ids `601` to `675`, for example `#601`) has one track for each of the 75 original species: its **Species Song**, the track every Beast of that species plays by default (its Genesis Track), as Casey's branch of [midi_fun_contract](https://github.com/caseywescott/midi_fun_contract) composes it. The section's title names the branch and commit it was built from (`BEAST_SONGS`; `beast-editions`, [PR #24](https://github.com/caseywescott/midi_fun_contract/pull/24), when this was written). Section 1 plays the music of the 2026-10-29 Sepolia deployment (its `BeastPureComposer` is built from midi_fun_contract `eebed3a`); section 6 is what this branch returns, so the two together are an A/B of the music.
+
+- **What the song is.** The Originals Sound Manager stores, for each species, `ComposerInputs::Song(get_generation_inputs({ composition_seed: 0 }, 0, { species_id: genesis_swap(id), name_variant_id: 0, tier, family }).base_song)` (beasts-v3's `deploy/records/sound-sepolia-*.json`, `sharedTracks.derivation`) and plays `BeastPureComposer.compose(inputs, sound_effects)`, which returns the MIDI and the TinySynth settings. Harpy (39) and Pegasus (40) publish each other's song (`genesis_swap`); their titles say so.
+- **What a track plays.** The song as written (`sound_effects` 0: not mega, no chip echo, no drift) for the species' regular Beast: level 50, health 200, no special name, as the song composes it; its card has the species' regular genesis GIF as an isolated image, on the same reference Beast page as the engine tests (`consumerPieces`, `validate_token_uri`).
+- **What it leaves out.** Monthly Track Editions (a purchase in edition 1 or later of species 1 to 75 plays the edition's style engine on the species' theme: a bought track, not the original's default), Drift (the Live mode's day, week and month changes, `compose_drift`), sound effects 1 to 3 (mega and chip echo; the Sepolia Genesis Beasts in section 1 are mega), name tracks and bought songs.
+- **Where the notes and sounds come from.** The notes are lab.js's `genesisMidi(id, false)` in that checkout, which the branch holds byte-identical to its Cairo; the sounds are `synth_settings.mjs`'s settings for the song's family (the Yeti's for species 68), the settings the contract returns. `tools/species_songs_check.mjs` runs the branch's own Cairo for all 75 species (`get_generation_inputs`, then `compose_sound(.., 0)`, under snforge) and requires every MIDI to be byte-identical and every settings hash equal. At `5c40273` all 75 are. The branch moves, so rerun the check when you rebuild from a newer commit (its header has the commands).
+- **Size.** 75 tracks with three art variants each would add about 7 MB. A track here has the original GIF page only (`lean` in `gen_tracks.mjs`; the art buttons, Card synced and the speed row are off for it), and the card's embedded font, the same 14.7 KB in every card and most of its bytes, is cut out and kept once (`cutFont`; `pageOf` puts it back by concatenation). That is +1.27 MB raw and +0.25 MB gzipped in `index.html`, for 75 tracks.
+
 ## Rebuild
 
-The page is built from three other repos, from clean worktrees at `main` (the footer alternative comes from one more onchain-midi-player checkout), plus the rendition sets in `renditions/`:
+The page is built from three other repos, from clean worktrees at `main` (the footer alternative comes from one more onchain-midi-player checkout, and section 6 from a checkout of Casey's branch), plus the rendition sets in `renditions/`:
 
 | Variable | Repo | What the build takes from it |
 | --- | --- | --- |
@@ -40,6 +50,7 @@ The page is built from three other repos, from clean worktrees at `main` (the fo
 | `BEAST` | [midi_fun_contract](https://github.com/caseywescott/midi_fun_contract) | Casey's beast-sound engine: the TinyChip settings and bank, and the species names, for the engine tests |
 | `BEASTS3` | [beasts-v3](https://github.com/Provable-Games/beasts-v3) (private) | The engine tests' card template and the 75 genesis GIFs; the deployed page footer (`assets/player-page/footer.html`, checked against its manifest and against onchain-midi-player's file at the manifest's source revision) |
 | `OMP_MAIN` | onchain-midi-player at `origin/main` | The "Upstream main" page footer (`examples/beast_consumer/fixtures/footer.html`) and its commit |
+| `BEAST_SONGS` (optional) | [midi_fun_contract](https://github.com/caseywescott/midi_fun_contract) at Casey's branch (`origin/beast-editions`) | Section 6: the 75 Species Songs (`genesisMidi`) and their family settings. `BEAST_SONGS_LABEL` names the branch and commit in the section title. Without `BEAST_SONGS` there is no section 6 |
 
 `build_site.mjs` bakes in each footer's text, commit and SHA-256 and a summary of each set in `renditions/`; it does not embed the sets. `OMP` may be a different commit from `OMP_MAIN`: the engine tests follow `OMP`, the footer selector follows `OMP_MAIN`. Rebuild when it moves or a set is added. To offer an open PR's footer, add `{ key, env, label, title }` to `FOOTER_CHOICES` and a checkout of its branch in that variable.
 
@@ -71,6 +82,10 @@ The engine is [pocket-synth](https://github.com/Provable-Games/pocket-synth). on
 
    # the upstream page footer (no install needed)
    git -C /workspace/onchain-midi-player worktree add --detach /workspace/onchain-midi-player-worktrees/sound-check-footer-main origin/main
+
+   # section 6: Casey's branch (the one he is working on; `git for-each-ref --sort=-committerdate refs/remotes/origin`, and his open PRs)
+   git -C /workspace/midi_fun_contract worktree add --detach /workspace/midi_fun_contract-worktrees/sound-check-songs origin/beast-editions
+   (cd /workspace/midi_fun_contract-worktrees/sound-check-songs/offchain/beast-sound && npm install)
    ```
 
 3. **Build** from this repo, on an up-to-date `main`:
@@ -82,11 +97,13 @@ The engine is [pocket-synth](https://github.com/Provable-Games/pocket-synth). on
    export BEAST=/workspace/midi_fun_contract-worktrees/sound-check
    export BEASTS3=/workspace/beasts-v3-worktrees/sound-check
    export OMP_MAIN=/workspace/onchain-midi-player-worktrees/sound-check-footer-main
+   export BEAST_SONGS=/workspace/midi_fun_contract-worktrees/sound-check-songs
    PLAYER=$(sed -n 's/^export const VERSION = "\([^"]*\)".*/\1/p' $OMP/scripts/segments.mjs)
    ENGINE=$(sed -n 's/^export const ENGINE_PIN = { ref: "\([^"]*\)".*/\1/p' $OMP/scripts/engine.mjs)
    export OMP_LABEL="origin/main $(git -C $OMP rev-parse --short HEAD) (player $PLAYER, pocket-synth $ENGINE)"
    export BEAST_LABEL="origin/main $(git -C $BEAST rev-parse --short HEAD)"
-   node tools/gen_tracks.mjs        # writes tools/tracks.json: expect 61 tracks and "warn []"
+   export BEAST_SONGS_LABEL="beast-editions $(git -C $BEAST_SONGS rev-parse --short HEAD)"
+   node tools/gen_tracks.mjs        # writes tools/tracks.json: expect 136 tracks (61 engine tests and 75 species songs) and "warn []"
    node tools/build_site.mjs        # writes index.html (the engine tests, the footers and a summary of renditions/)
    ```
 

@@ -414,8 +414,10 @@ ${BANNER}
 var D = JSON.parse(document.getElementById("data").textContent);
 var T = D.tracks, F = D.fixed, KEY = "beast-sound-check-${V}-v1";
 // the page as consumerPieces composed it: fixed fragments, this track's art and D, and its alignment whitespace
-function pageOf(t, v) { var p = t.pages[v], sp = function (n) { return new Array(9 * n + 1).join(" "); };
-  return F.head + labStyle() + engineTest() + sp(p.ws[0]) + F.gunzip + sp(p.ws[1]) + F.player + F.body + labArt(v ? speedArt(t, p.art) : p.art) + t.d + sp(p.ws[2]) + (F.notes ? F.notes + sp(p.ws[3]) : "") + F.footer; }
+// (a lean track's art has the card's embedded font cut out: gen_tracks.mjs cutFont)
+function pageOf(t, v) { if (!t.pages[v]) v = 0; var p = t.pages[v], sp = function (n) { return new Array(9 * n + 1).join(" "); },
+  art = p.f ? p.art.slice(0, p.f[0]) + D.fonts[p.f[1]] + p.art.slice(p.f[0]) : p.art;
+  return F.head + labStyle() + engineTest() + sp(p.ws[0]) + F.gunzip + sp(p.ws[1]) + F.player + F.body + labArt(v ? speedArt(t, art) : art) + t.d + sp(p.ws[2]) + (F.notes ? F.notes + sp(p.ws[3]) : "") + F.footer; }
 function variant() { return store.art === "gif" ? 0 : store.card ? 2 : 1; }
 var ENGINE_TEST = ${JSON.stringify(ENGINE_TEST)};
 var TESTS = { meter: { hint: null, preroll: null }, big1: { hint: "playback", preroll: 1 }, big02: { hint: "playback", preroll: 0.2 },
@@ -448,7 +450,9 @@ function speedArt(t, art) {
   return art.slice(0, m.index) + m[1] + btoa(svg) + art.slice(m.index + m[0].length - 1);
 }
 // what a rating was made with: "static", "gif", or the speed step in effect
-function artTag(t) { return t.art.animated === false ? "static" : store.art === "gif" ? "gif" : speedOf(t); }
+// a lean track (section 6) has the original GIF only
+function lean(t) { return t.pages.length === 1; }
+function artTag(t) { return t.art.animated === false ? "static" : store.art === "gif" || lean(t) ? "gif" : speedOf(t); }
 function tagText(t, tag) {
   if (tag === "static") return "static art";
   if (tag === "gif") return "original GIF art";
@@ -603,11 +607,12 @@ function pageGif(html) {
   return out.length ? out : null;
 }
 
-$("intro").textContent = "Two parts. Section 1, Beasts on Sepolia: real Beasts, each the exact animation_url page of a token on the latest Beasts V3 Sepolia deployment (TinySynth " + SEPD.sets[0].tinysynth + ", the Beasts renderer's card, the Originals Sound Manager's music), rebuilt from a stored rendition set and checked against its SHA-256 before it plays. Pick a species and a variant: its Genesis Beast or presets 0 to 3. Their art is the card's GIF as an isolated image, on its own clock as deployed; a retiming page footer (" + ((firstRetimer() || {}).label || "none") + ") plays it on the music's beat, and the Animation speed row then tunes how many notes each GIF frame lasts. Then " + T.length + " engine tests (sections 2 to 5): synthetic tracks on onchain-midi-player " + D.meta.playerVersion + "'s reference Beast page, which test the engine, not shipping Beasts: their cards are templates and their inline Synced art (a sprite sheet stepped on the beat and seeked to the music) follows the music; switch to the original GIF to compare, and Animation speed sets how many notes each Synced frame lasts (by default as shipped: an eighth note, or a quarter note above 150 BPM). Each track plays in a sandboxed frame, as on a marketplace. Results are saved on this device.";
+var nSongs = T.filter(function (t) { return t.sectionId === "6"; }).length, nEng = T.length - nSongs;
+$("intro").textContent = "Two parts. Section 1, Beasts on Sepolia: real Beasts, each the exact animation_url page of a token on the latest Beasts V3 Sepolia deployment (TinySynth " + SEPD.sets[0].tinysynth + ", the Beasts renderer's card, the Originals Sound Manager's music), rebuilt from a stored rendition set and checked against its SHA-256 before it plays. Pick a species and a variant: its Genesis Beast or presets 0 to 3. Their art is the card's GIF as an isolated image, on its own clock as deployed; a retiming page footer (" + ((firstRetimer() || {}).label || "none") + ") plays it on the music's beat, and the Animation speed row then tunes how many notes each GIF frame lasts. Then " + nEng + " engine tests (sections 2 to 5): synthetic tracks on onchain-midi-player " + D.meta.playerVersion + "'s reference Beast page, which test the engine, not shipping Beasts: their cards are templates and their inline Synced art (a sprite sheet stepped on the beat and seeked to the music) follows the music; switch to the original GIF to compare, and Animation speed sets how many notes each Synced frame lasts (by default as shipped: an eighth note, or a quarter note above 150 BPM). " + (nSongs ? "Section 6 has the " + nSongs + " Species Songs of Casey's branch (" + (D.meta || {}).songsCommit + "), one per original species, on the same reference page: the song every original of that species plays by default, with its own Beast's original GIF as the art. " : "") + "Each track plays in a sandboxed frame, as on a marketplace. Results are saved on this device.";
 var meta = D.meta || {};
-$("foot").textContent = "Beasts on Sepolia: " + SEPD.sets.map(function (s) { return s.dir + " (block " + s.blockNumber + ", " + s.tokens + " tokens)"; }).join(", ") + ". Page footers: " + FTKEYS.map(function (k) { return ftOf(k).label + ", onchain-midi-player " + short(ftOf(k).commit) + (k ? "" : " (Beasts' vendored copy)"); }).join("; ") + ". Engine tests: player " + meta.playerVersion + ", " + (meta.beastCommit || "") + ", " + (meta.ompCommit || "") + ". Generated " + (meta.generated || "").slice(0, 10) + ".";
+$("foot").textContent = "Beasts on Sepolia: " + SEPD.sets.map(function (s) { return s.dir + " (block " + s.blockNumber + ", " + s.tokens + " tokens)"; }).join(", ") + ". Page footers: " + FTKEYS.map(function (k) { return ftOf(k).label + ", onchain-midi-player " + short(ftOf(k).commit) + (k ? "" : " (Beasts' vendored copy)"); }).join("; ") + ". Engine tests: player " + meta.playerVersion + ", " + (meta.beastCommit || "") + ", " + (meta.ompCommit || "") + (meta.songsCommit ? ". Species Songs: midi_fun_contract " + meta.songsCommit : "") + ". Generated " + (meta.generated || "").slice(0, 10) + ".";
 $("sepintro").textContent = "Real Beasts read from the latest Beasts V3 Sepolia deployment at one block: one Beast for each of the 75 original species at visual presets 0 to 3 (sound effects equal to the preset) and the 75 Genesis Beasts. The set is stored in this site's renditions/ folder and fetched when the page opens; each token_uri is rebuilt from it and checked against its SHA-256 before it plays, and a Beast that fails the check is not played.";
-$("listintro").textContent = "Section 1 is the real Beasts, one row per species (pick the variant above). Sections 2 to 5 are the engine tests.";
+$("listintro").textContent = "Section 1 is the real Beasts, one row per species (pick the variant above). Sections 2 to 5 are the engine tests." + (nSongs ? " Section 6 is the Species Songs of Casey's branch, one per original species." : "");
 
 // global checklist
 Array.prototype.forEach.call(document.querySelectorAll("[data-g]"), function (cb) {
@@ -629,6 +634,10 @@ var listEl = $("list"), rows = {}, secCount = {}, realSec = { d: el("details"), 
   var sec = null, body = null;
   T.forEach(function (t) {
     if (!sec || sec.id !== t.sectionId) {
+      if (t.sectionId === "6") {
+        listEl.appendChild(el("h3", "enghd", "Original species songs"));
+        listEl.appendChild(el("p", "muted", "One track for each of the 75 original species: the Species Song every Beast of that species plays by default (its Genesis Track), from Casey's branch of midi_fun_contract (" + (meta.songsCommit || "") + "), as written (sound effects 0). The notes are lab.js's genesisMidi, which that branch holds byte-identical to its Cairo composer, and the settings its family's TinyChip presets and chip drums. Each plays on the same reference Beast page as the engine tests, with the species' own regular Beast (level 50, health 200) and its original GIF only, to keep the page small."));
+      }
       var d = el("details"); var s = el("summary"); s.appendChild(el("span", "", t.sectionId + " " + t.section)); var n = el("span", "n", ""); s.appendChild(n); d.appendChild(s);
       listEl.appendChild(d); sec = { id: t.sectionId, d: d, n: n }; secCount[t.sectionId] = { n: n, total: 0, ids: [] }; body = d;
     }
@@ -843,22 +852,23 @@ function showReal(tok) {
 }
 
 function paintArt() {
-  var t = T[idx], a = t.art, synced = store.art !== "gif";
+  var t = T[idx], a = t.art, synced = store.art !== "gif" && !lean(t);
+  $("engctl").hidden = lean(t);
   $("aGif").setAttribute("aria-pressed", synced ? "false" : "true");
   $("aSync").setAttribute("aria-pressed", synced ? "true" : "false");
   $("cardSync").checked = !!store.card; $("cardSync").disabled = !synced;
   var animated = a.animated !== false, k = speedOf(t), ship = shippedSpeed(a);
   Array.prototype.forEach.call(document.querySelectorAll("[data-speed]"), function (b) {
     var key = b.getAttribute("data-speed");
-    b.setAttribute("aria-pressed", animated && key === k ? "true" : "false"); b.disabled = !(synced && animated);
-    b.classList.toggle("ship", animated && key === ship);
+    b.setAttribute("aria-pressed", animated && !lean(t) && key === k ? "true" : "false"); b.disabled = !(synced && animated);
+    b.classList.toggle("ship", animated && !lean(t) && key === ship);
   });
   $("speedship").hidden = !store.speed;
   $("speedlbl").textContent = "Animation speed: one Synced frame per";
-  $("speedwhy").textContent = !animated ? "Off: this Beast is a static PNG, with no frames to time." : !synced ? "Off for the original GIF: it keeps its own clock, the baseline to compare with." : "Dashed: the shipped speed at this tempo.";
+  $("speedwhy").textContent = !animated ? "Off: this Beast is a static PNG, with no frames to time." : lean(t) ? "Off: this track has the original GIF only (one art variant keeps the page small), so there are no Synced frames to time." : !synced ? "Off for the original GIF: it keeps its own clock, the baseline to compare with." : "Dashed: the shipped speed at this tempo.";
   var gif = a.gifMs && a.gifMs.length ? (a.gifMs.every(function (x) { return x === a.gifMs[0]; }) ? a.gifMs[0] : a.gifMs.join("/")) + " ms" : "?";
-  $("artinfo").textContent = "Beast: " + a.name + " (" + (a.shiny ? "shiny" : "regular") + ", " + (a.animated === false ? "static, PNG " + a.spriteBytes + " B" : "animated, " + a.frames + " frames; GIF " + a.gifBytes + " B, sprite sheet " + a.spriteBytes + " B") + "); tempo " + a.bpm + " BPM." +
-    (animated ? " Synced: " + msAt(a, k) + " per frame, one per " + SPEEDS[k].note + " (" + SPEEDS[k].label + "); shipped: " + SPEEDS[ship].note + " (" + msAt(a, ship) + "). GIF: " + gif + " per frame, on its own clock." : "") + " The song's notes scroll behind it.";
+  $("artinfo").textContent = "Beast: " + a.name + " (" + (a.shiny ? "shiny" : "regular") + ", " + (a.animated === false ? "static, PNG " + a.spriteBytes + " B" : "animated, " + a.frames + " frames; GIF " + a.gifBytes + " B" + (lean(t) ? "" : ", sprite sheet " + a.spriteBytes + " B")) + "); tempo " + a.bpm + " BPM." +
+    (animated && !lean(t) ? " Synced: " + msAt(a, k) + " per frame, one per " + SPEEDS[k].note + " (" + SPEEDS[k].label + "); shipped: " + SPEEDS[ship].note + " (" + msAt(a, ship) + "). GIF: " + gif + " per frame, on its own clock." : lean(t) && animated ? " GIF: " + gif + " per frame, on its own clock." : "") + " The song's notes scroll behind it.";
 }
 function setArt(mode, card) {
   if (mode !== undefined) store.art = mode;
