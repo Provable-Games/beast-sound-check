@@ -32,6 +32,11 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const data = JSON.parse(fs.readFileSync(path.join(here, "tracks.json"), "utf8"));
+data.production = JSON.parse(fs.readFileSync(path.join(here, "../production/manifest.json"), "utf8"));
+// OUT may be old/index.html; keep the shared worker reachable from either page.
+data.production.worker = path.relative(path.dirname(path.resolve(process.env.OUT || path.join(here, "../index.html"))), path.join(here, "..", data.production.worker)).split(path.sep).join("/");
+const SAMPLER = fs.readFileSync(path.join(here, "production-sampler.js"), "utf8");
+if (/<\/script|<!--/i.test(SAMPLER)) throw new Error("production-sampler.js cannot be inlined");
 const need = (k) => process.env[k] || (console.error(`set ${k} (see the header)`), process.exit(2));
 const sha256 = (s) => crypto.createHash("sha256").update(s).digest("hex");
 const git = (dir, ...a) => execFileSync("git", ["-C", dir, ...a], { encoding: "utf8", maxBuffer: 1 << 26 });
@@ -288,6 +293,12 @@ textarea{width:100%;min-height:76px;margin-top:10px;padding:10px;border-radius:1
 .pwmsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;text-align:center;color:#fff;font-size:15px;overflow-wrap:anywhere}
 .pwmsg.bad{color:#ffb4ab;font-weight:600}
 .enghd{margin:22px 0 2px;font-size:18px}
+.samplegrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+.samplegrid[hidden],.samplewide[hidden]{display:none}
+.samplegrid .field{min-width:0;margin:0}.samplegrid select,.samplegrid input{width:100%;min-width:0;box-sizing:border-box;min-height:44px;font:inherit}
+.samplegrid input{border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--surface);color:inherit}
+.samplewide{grid-column:1/-1}.sampleactions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.sampleactions button{min-height:44px;flex:1}
+#sample-seed{font-family:monospace}#sample-source{font-size:12px;overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -305,9 +316,36 @@ ${BANNER}
   <label><input type="checkbox" data-g="pause"><span><b>Pause and resume.</b> Tap pause while a dense track plays. All sound must stop at once (no stuck notes). Tap play: the music carries on from the same point. The art: on a real Beast, the GIF holds still while the music is paused and moves again on play (the deployed footer freezes and retimes it, as upstream's does). On an engine test, the Synced art freezes on the frame you last heard and moves again in step with the music.</span></label>${BGBLOCK}
 </details>
 
-<section class="card" id="sepolia" aria-labelledby="sephd">
-  <div class="kicker">Section 1</div>
-  <h2 id="sephd">Beasts on Sepolia</h2>
+<section class="card" id="sampler" aria-labelledby="sample-hd">
+  <div class="kicker">Proposed production sound</div>
+  <h2 id="sample-hd">Sample all 75 Beasts</h2>
+  <p class="muted">Choose a track and sound effects, then step through the species with the same settings. Change a name, style or seed to explore variations.</p>
+  <div class="samplegrid">
+    <label class="field"><span>Species</span><select id="sample-species"></select></label>
+    <label class="field"><span>Track</span><select id="sample-kind"><option value="species">Species Song</option><option value="check">Sound Check</option><option value="name">Name Song</option><option value="purchase">Custom canon (edition 0)</option><option value="edition">Edition track</option></select></label>
+    <label class="field samplewide"><span>Sound effects</span><select id="sample-fx"><option value="0">0 · As written</option><option value="1">1 · Mega</option><option value="2">2 · Chip echo / portato</option><option value="3">3 · Mega + chip echo / accent</option></select></label>
+    <div class="samplegrid samplewide" id="sample-name-row">
+      <label class="field"><span>Name prefix</span><select id="sample-prefix"></select></label>
+      <label class="field"><span>Name suffix</span><select id="sample-suffix"></select></label>
+    </div>
+    <div class="samplegrid samplewide" id="sample-edition-row" hidden>
+      <label class="field"><span>Style</span><select id="sample-style"></select></label>
+      <label class="field"><span>Edition</span><input id="sample-edition" type="number" min="1" max="4294967295" step="1" value="1"></label>
+    </div>
+    <div class="samplewide" id="sample-seed-row" hidden>
+      <label class="field"><span>Seed (decimal or 0x hexadecimal)</span><input id="sample-seed" type="text" value="1" spellcheck="false" autocomplete="off"></label>
+      <div class="sampleactions"><button id="sample-next-seed">Next seed</button><button id="sample-random">Random seed</button></div>
+    </div>
+  </div>
+  <p class="hint" id="sample-hint"></p>
+  <div class="sampleactions"><button id="sample-prev" aria-label="Previous species">&larr; Prev</button><button id="sample-play">Reload</button><button id="sample-next" aria-label="Next species">Next &rarr;</button></div>
+  <p class="err" id="sample-error" role="alert" hidden></p>
+  <p class="hint" id="sample-now" aria-live="polite"></p>
+  <p class="muted" id="sample-source"></p>
+</section>
+
+<details class="card" id="sepolia">
+  <summary id="sephd">Deployed Sepolia reference pages</summary>
   <p class="muted" id="sepintro"></p>
   <label class="field" id="setrow" hidden><span>Rendition set</span><select id="setsel"></select></label>
   <label class="field"><span>Species</span><select id="species" disabled><option>Loading the rendition set&hellip;</option></select></label>
@@ -319,7 +357,7 @@ ${BANNER}
     <button data-var="p3" aria-pressed="false" disabled>Preset 3<small></small></button>
   </div>
   <p class="err" id="seperr" role="alert" hidden></p>
-</section>
+</details>
 
 <section class="card" id="cur" aria-live="polite">
   <div class="kicker" id="kick"></div>
@@ -489,6 +527,7 @@ function labStyle() { if (!labOn()) return ""; var l = store.lab;
 try { var raw = localStorage.getItem(KEY); if (raw) { var o = JSON.parse(raw); if (o && typeof o === "object") { store.r = o.r || {}; store.g = o.g || {}; store.last = o.last || ""; store.art = o.art === "gif" ? "gif" : "synced";
   if (o.lab && typeof o.lab === "object" && [o.lab.min, o.lab.max, o.lab.target, o.lab.s].every(function (x) { return typeof x === "number" && x > 0; })) store.lab = { min: o.lab.min, max: o.lab.max, target: o.lab.target, s: o.lab.s }; store.card = !!o.card; store.test = TESTS[o.test] ? o.test : ""; store.speed = SPEEDS[o.speed] ? o.speed : "";
   store.set = typeof o.set === "string" ? o.set : ""; store.ft = o.ft && FTKEYS.indexOf(o.ft) > 0 ? o.ft : "";
+  if (o.sample && typeof o.sample === "object") store.sample = o.sample;
 } } } catch (e) {}
 function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} }
 save();
@@ -614,11 +653,11 @@ function pageGif(html) {
 }
 
 var nSongs = T.filter(function (t) { return t.sectionId === "6"; }).length, nEng = T.length - nSongs;
-$("intro").textContent = "Two parts. Section 1, Beasts on Sepolia: real Beasts, each the exact animation_url page of a token on the latest Beasts V3 Sepolia deployment (TinySynth " + SEPD.sets[0].tinysynth + ", the Beasts renderer's card, the Originals Sound Manager's music), rebuilt from a stored rendition set and checked against its SHA-256 before it plays. Pick a species and a variant: its Genesis Beast or presets 0 to 3. Their art is the card's GIF as an isolated image, which the page footer " + (FT.deployed.retimes ? "(as deployed, or " + ((firstRetimer() || {}).label || "another") + ")" : "(" + ((firstRetimer() || {}).label || "none") + ")") + " plays on the music's beat; the Animation speed row tunes how many notes each GIF frame lasts. Then " + nEng + " engine tests (sections 2 to 5): synthetic tracks on onchain-midi-player " + D.meta.playerVersion + "'s reference Beast page, which test the engine, not shipping Beasts: their cards are templates and their inline Synced art (a sprite sheet stepped on the beat and seeked to the music) follows the music; switch to the original GIF to compare, and Animation speed sets how many notes each Synced frame lasts (by default as shipped: an eighth note, or a quarter note above 150 BPM). " + (nSongs ? "Section 6 has the " + nSongs + " Species Songs of Casey's branch (" + (D.meta || {}).songsCommit + "), one per original species, on the same reference page: the song every original of that species plays by default, with its own Beast's original GIF as the art. " : "") + "Each track plays in a sandboxed frame, as on a marketplace. Results are saved on this device.";
+$("intro").textContent = "Explore the proposed sound for all 75 original Beasts: Sound Checks, Species Songs, named songs and custom tracks in all 23 edition styles. Compare the same settings across species, save notes and export results. Deployed Sepolia pages and " + nEng + " engine tests are available below as references.";
 var meta = D.meta || {};
 $("foot").textContent = "Beasts on Sepolia: " + SEPD.sets.map(function (s) { return s.dir + " (block " + s.blockNumber + ", " + s.tokens + " tokens)"; }).join(", ") + ". Page footers: " + FTKEYS.map(function (k) { return ftOf(k).label + ", onchain-midi-player " + short(ftOf(k).commit) + (k ? "" : " (Beasts' vendored copy)"); }).join("; ") + ". Engine tests: player " + meta.playerVersion + ", " + (meta.beastCommit || "") + ", " + (meta.ompCommit || "") + (meta.songsCommit ? ". Species Songs: midi_fun_contract " + meta.songsCommit : "") + ". Generated " + (meta.generated || "").slice(0, 10) + ".";
 $("sepintro").textContent = "Real Beasts read from the latest Beasts V3 Sepolia deployment at one block: one Beast for each of the 75 original species at visual presets 0 to 3 (sound effects equal to the preset) and the 75 Genesis Beasts. The set is stored in this site's renditions/ folder and fetched when the page opens; each token_uri is rebuilt from it and checked against its SHA-256 before it plays, and a Beast that fails the check is not played.";
-$("listintro").textContent = "Section 1 is the real Beasts, one row per species (pick the variant above). Sections 2 to 5 are the engine tests." + (nSongs ? " Section 6 is the Species Songs of Casey's branch, one per original species." : "");
+$("listintro").textContent = "Section 1 is the real Beasts, one row per species (pick the variant above). Sections 2 to 5 are the engine tests." + (nSongs ? " Section 6 is the production Species Songs baseline, one per original species." : "");
 
 // global checklist
 Array.prototype.forEach.call(document.querySelectorAll("[data-g]"), function (cb) {
@@ -627,7 +666,7 @@ Array.prototype.forEach.call(document.querySelectorAll("[data-g]"), function (cb
 });
 function gsum() { var n = Object.keys(store.g).filter(function (k) { return store.g[k]; }).length; $("gsum").textContent = "Global checklist (do once): " + n + " of " + document.querySelectorAll("[data-g]").length + " ticked"; }
 gsum();
-if (!Object.keys(store.g).some(function (k) { return store.g[k]; }) && !Object.keys(store.r).length) $("global").open = true;
+if (!D.production && !Object.keys(store.g).some(function (k) { return store.g[k]; }) && !Object.keys(store.r).length) $("global").open = true;
 
 // list: section 1 (one row per species, filled when the set opens), then the engine tests
 var listEl = $("list"), rows = {}, secCount = {}, realSec = { d: el("details"), n: el("span", "n", ""), body: el("div"), rows: {} };
@@ -642,7 +681,7 @@ var listEl = $("list"), rows = {}, secCount = {}, realSec = { d: el("details"), 
     if (!sec || sec.id !== t.sectionId) {
       if (t.sectionId === "6") {
         listEl.appendChild(el("h3", "enghd", "Original species songs"));
-        listEl.appendChild(el("p", "muted", "One track for each of the 75 original species: the Species Song every Beast of that species plays by default (its Genesis Track), from Casey's branch of midi_fun_contract (" + (meta.songsCommit || "") + "), as written (sound effects 0). The notes are lab.js's genesisMidi, which that branch holds byte-identical to its Cairo composer, and the settings its family's TinyChip presets and chip drums. Each plays on the same reference Beast page as the engine tests, with the species' own regular Beast (level 50, health 200) and its original GIF only, to keep the page small."));
+        listEl.appendChild(el("p", "muted", "One track for each of the 75 original species: the Species Song every Beast of that species plays by default (its Genesis Track), from the production midi_fun_contract composer (" + (meta.songsCommit || "") + "), as written (sound effects 0). The notes are lab.js's genesisMidi, verified byte-identical to its Cairo composer, and the settings its family's TinyChip presets and chip drums. Each plays on the same reference Beast page as the engine tests, with the species' own regular Beast (level 50, health 200) and its original GIF only, to keep the page small."));
       }
       var d = el("details"); var s = el("summary"); s.appendChild(el("span", "", t.sectionId + " " + t.section)); var n = el("span", "n", ""); s.appendChild(n); d.appendChild(s);
       listEl.appendChild(d); sec = { id: t.sectionId, d: d, n: n }; secCount[t.sectionId] = { n: n, total: 0, ids: [] }; body = d;
@@ -775,10 +814,11 @@ function mountReal() {
 }
 
 function seq() { return SEP.keys.concat(T.map(function (t) { return t.id; })); }
-function curKey() { return cur ? realKey(cur.tok.speciesId, varOf(cur.tok)) : T[idx].id; }
-function paintPos() { var q = seq(), i = q.indexOf(curKey()); $("pos").textContent = (i + 1) + " / " + q.length; }
-function step(d) { var q = seq(), i = q.indexOf(curKey()); go(q[(i + d + q.length) % q.length]); }
+function curKey() { return productionActive() ? sampleKey(audition.input) : cur ? realKey(cur.tok.speciesId, varOf(cur.tok)) : T[idx].id; }
+function paintPos() { if (productionActive()) { $("pos").textContent = "Species " + audition.input.sid + " / 75"; return; } var q = seq(), i = q.indexOf(curKey()); $("pos").textContent = (i + 1) + " / " + q.length; }
+function step(d) { if (productionActive()) { sampleStep(d); return; } var q = seq(), i = q.indexOf(curKey()); go(q[(i + d + q.length) % q.length]); }
 function go(key) {
+  var sample = parseSampleKey(key); if (sample) return showSample(sample);
   var tok = realTok(key); if (tok) { showReal(tok); return true; }
   var i = byId(key); if (i >= 0) { showEngine(i); return true; }
   return false;
@@ -794,6 +834,7 @@ function panels(real) {
   if (real) { $("lab").hidden = true; $("labbadge").hidden = true; } else { $("ftbadge").hidden = true; paintLab(); }
 }
 function showEngine(i) {
+  leaveSample();
   cur = null; mountSeq++;
   idx = i; var t = T[i];
   panels(false);
@@ -841,6 +882,8 @@ function paintFacts(tok) {
     ["Block", m.blockNumber + " (" + SEP.dir + ", " + m.chainId + ")"]].forEach(function (x) { dl.appendChild(el("dt", "", x[0])); dl.appendChild(el("dd", "", x[1])); });
 }
 function showReal(tok) {
+  leaveSample();
+  $("sepolia").open = true;
   cur = { tok: tok, html: "", err: "" };
   panels(true);
   $("kick").textContent = "1 Beasts on Sepolia \\u00b7 " + SEP.dir + " \\u00b7 block " + SEP.set.manifest.blockNumber;
@@ -922,6 +965,7 @@ function realRec(tok) {
 }
 function stampFooter(r) { var f = ftOf(store.ft); r.ft = store.ft || "deployed"; r.fl = f.label; r.fc = f.commit; if (cur) { r.spd = realStep(cur.tok) || "own"; r.spt = realSpeedText(cur.tok); } }
 function setRate(s) {
+  if (productionActive()) { if (audition.busy || audition.error) return; var sr = sampleRecord(); sr.s = sr.s === s ? "" : s; rateUi(sr); save(); return; }
   if (cur) {
     var q = realRec(cur.tok);
     q.s = q.s === s ? "" : s;
@@ -938,13 +982,14 @@ function setRate(s) {
 $("bp").addEventListener("click", function () { setRate("pass"); });
 $("bf").addEventListener("click", function () { setRate("fail"); });
 function setNote(v) {
+  if (productionActive()) { if (audition.busy || audition.error) return; var sr = sampleRecord(); sr.n = v; save(); return; }
   if (cur) { if (!v && !store.r[rk(cur.tok)]) return; var q = realRec(cur.tok); q.n = v; if (!q.s) stampFooter(q); save(); paintRealRows(); return; }
   var id = T[idx].id, r = store.r[id] || (store.r[id] = {}); r.n = v; save(); paintRow(id);
 }
 $("note").addEventListener("input", function () {
   clearTimeout(noteTimer);
-  var v = $("note").value, c = cur, i = idx;
-  noteTimer = setTimeout(function () { if (c === cur && i === idx) setNote(v); }, 300);
+  var v = $("note").value, key = curKey();
+  noteTimer = setTimeout(function () { if (key === curKey()) setNote(v); }, 300);
 });
 $("note").addEventListener("blur", function () { setNote($("note").value); });
 $("prev").addEventListener("click", function () { step(-1); });
@@ -978,7 +1023,7 @@ function summary() {
   });
   var g = Object.keys(store.g).filter(function (k) { return store.g[k]; });
   var out = ["Beast Sound Check results", new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC", navigator.userAgent,
-    "Global checklist ticked: " + (g.length ? g.join(", ") : "none"), ""].concat(realSummary(), ["", "Engine tests (onchain-midi-player's reference Beast page)",
+    "Global checklist ticked: " + (g.length ? g.join(", ") : "none"), ""].concat(PROD ? sampleSummary().concat([""]) : [], realSummary(), ["", "Engine tests (onchain-midi-player's reference Beast page)",
     "Player " + meta.playerVersion + ", " + meta.ompCommit + "; music " + meta.beastCommit + "; built " + (meta.generated || "").slice(0, 16),
     labOn() ? "Design lab override (not the shipped page): " + labText() : "Play button: shipped settings",
     "Animation speed now: " + (store.speed ? SPEEDS[store.speed].label + " (one frame per " + SPEEDS[store.speed].note + ") on every animated Beast" : "shipped (an eighth note per frame, a quarter note above 150 BPM)") + "; a rated track shows the art and speed it was rated with",
@@ -1006,6 +1051,7 @@ $("clear").addEventListener("click", function () {
 });
 
 function paintLab() {
+  if (productionActive()) { $("lab").hidden = true; return; }
   if (!SHIP) { $("lab").hidden = true; return; }
   if (cur) return;
   $("lab").hidden = false;
@@ -1039,21 +1085,23 @@ $("lfix").addEventListener("change", function () { $("lmin").value = $("lmax").v
 $("lreset").addEventListener("click", function () { store.lab = null; save(); paintLab(); reloadEngine(); });
 paintLab();
 $("alone").addEventListener("click", function () {
-  var html = cur ? cur.html : pageOf(T[idx], variant());
+  var html = productionActive() ? audition.html : cur ? cur.html : pageOf(T[idx], variant());
   if (!html) { toast(cur && cur.err ? "Not opened: " + cur.err : "This Beast has not loaded yet."); return; }
   var url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
   if (!window.open(url, "_blank")) toast("The browser blocked the new tab.");
 });
-// Start: the track in the URL's hash, else the last one shown, else the Genesis Warlock. An engine test shows at once;
+${SAMPLER}
+// Start: a shared link, last selection, or the production Species Song sampler.
 // a real Beast once its set has opened (the newest set unless another was chosen), falling back to the first engine
 // test when real Beasts cannot play here.
 (function () {
-  var want = (location.hash || "").slice(1) || store.last, engine = byId(want) >= 0;
+  var want = (location.hash || "").slice(1) || store.last || "sample-1-species-0-0-0-0", engine = byId(want) >= 0 || !!parseSampleKey(want);
   var dir = SEPD.sets.some(function (s) { return s.dir === store.set; }) ? store.set : SEPD.sets[0].dir;
   if (engine) go(want);
-  else { panels(true); $("realctl").hidden = true; $("kick").textContent = "1 Beasts on Sepolia"; $("ttl").textContent = "Loading the rendition set\\u2026"; pwMsg("Loading the rendition set " + dir + "\\u2026"); }
+  else { panels(true); $("sepolia").open = true; $("realctl").hidden = true; $("kick").textContent = "1 Beasts on Sepolia"; $("ttl").textContent = "Loading the rendition set\\u2026"; pwMsg("Loading the rendition set " + dir + "\\u2026"); }
+  var waiting = mountSeq;
   openSet(dir, function () {
-    if (!engine && !go(want) && !go(DEFAULT_REAL)) go(T[0].id);
+    if (!engine && mountSeq === waiting && !go(want) && !go(DEFAULT_REAL)) go(T[0].id);
     paintPos();
   });
 })();

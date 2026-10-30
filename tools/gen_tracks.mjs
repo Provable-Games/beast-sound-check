@@ -247,7 +247,7 @@ function splitPage(html, art, d, title) {
 }
 
 const SEC = { preset: "2 TinyChip presets", drum: "3 Drums", edge: "4 General range and edge cases", bank: "5 Client chip bank (not onchain)" };
-if (SONGS) SEC.songs = `6 Original species songs (Casey's branch ${SONGS.label})`;
+if (SONGS) SEC.songs = `6 Original species songs (production ${SONGS.label})`;
 
 // =============================================================================================
 // Section 1 is the real Beasts (Beasts on Sepolia), which the page reads from renditions/ at run time; it has no
@@ -924,7 +924,7 @@ if (SONGS) {
     const own = swap === id ? "" : `${name} plays ${partner}'s Genesis Track (the default swap of Harpy and Pegasus, as the Originals Sound Manager publishes it). `;
     add({
       lean: true, section: SEC.songs, title: swap === id ? name : `${name} (${partner}'s song)`,
-      blurb: `The Species Song of the ${name}: the track every ${name} plays by default (its Genesis Track), composed by Casey Wescott's branch ${SONGS.label}. ${own}${FAMILY[type]} family, tier ${tier}; ${info.key}, ${bpm} BPM, ${info.sections} sections, ${info.channels.length} channels. As written (sound effects 0): not mega, no echo, no drift.`,
+      blurb: `The Species Song of the ${name}: the track every ${name} plays by default (its Genesis Track), from the production composer ${SONGS.label}. ${own}${FAMILY[type]} family, tier ${tier}; ${info.key}, ${bpm} BPM, ${info.sections} sections, ${info.channels.length} channels. As written (sound effects 0): not mega, no echo, no drift.`,
       checks: [
         `Tap the round play button on the card: the music starts within about half a second, with no error text at the bottom of the player. It is the ${partner}'s Species Song in ${info.key} at ${bpm} BPM: ${info.sections} sections, then the loop.`,
         `Voices: ${info.channels.join(", ")}. The sounds are the ${FAMILY[type]} family's TinyChip presets (three leads, three plucks)${yeti ? " and Pulse 12.5% Pluck, the Yeti's avalanche," : ""} and the chip drum kit, with reverb 30: the settings the contract returns for this song, not hand-picked presets.`,
