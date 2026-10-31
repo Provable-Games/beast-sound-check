@@ -2,6 +2,7 @@
 // Generate tests in an isolated midi_fun_contract copy; compare their actual compose_sound
 // outputs with the exact adapter shipped to the sampler. See README for the refresh commands.
 import fs from 'node:fs';
+import path from 'node:path';
 import { productionSource, sha256 } from './production-source.mjs';
 
 import { cases } from './production-cases.mjs';
@@ -67,7 +68,8 @@ ${selected.map((x, i) => `#[test]\n#[ignore]\nfn production_parity_${String(i).p
   if (failures.length) console.log(JSON.stringify(failures.slice(0, 25), null, 2));
   if (failures.length || seen.size !== matrix.length) process.exitCode = 1;
   else {
-    fs.mkdirSync('production', { recursive: true });
-    fs.writeFileSync('production/parity.json', JSON.stringify({ revision: source.revision, adapterHash: source.adapterHash, casesHash: sha256(JSON.stringify(matrix)), cases: matrix.length, result: 'identical MIDI bytes and Cairo settings hashes' }, null, 2) + '\n');
+    const out = process.env.PARITY_OUT || 'production/parity.json';
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    fs.writeFileSync(out, JSON.stringify({ revision: source.revision, adapterHash: source.adapterHash, casesHash: sha256(JSON.stringify(matrix)), cases: matrix.length, result: 'identical MIDI bytes and Cairo settings hashes' }, null, 2) + '\n');
   }
 } else throw new Error('Usage: production-parity.mjs cairo | compare <Cairo log>');

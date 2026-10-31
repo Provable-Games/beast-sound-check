@@ -148,7 +148,7 @@ function sampleRecord() {
 function sampleSummary() {
   var records = Object.keys(store.r).map(function (k) { return store.r[k]; }).filter(function (r) { return r.production && (r.s || r.n); });
   records.sort(function (a, b) { return (a.s === 'fail' ? 0 : 1) - (b.s === 'fail' ? 0 : 1) || a.production.input.sid - b.production.input.sid; });
-  return ['Proposed Beast sound samples', 'Source midi_fun_contract ' + PROD.revision + '; adapter ' + PROD.adapterHash + '; ' + (PROD.candidate ? 'candidate audition; Cairo parity pending' : PROD.parity.cases + ' Cairo parity cases'), 'Rated/noted samples: ' + records.length].concat(records.map(function (r) {
+  return ['Proposed Beast sound samples', 'Source midi_fun_contract ' + PROD.revision + '; adapter ' + PROD.adapterHash + '; ' + (PROD.candidate ? (PROD.parity.cases ? PROD.parity.cases + ' Cairo parity cases; musical approval pending' : 'candidate audition; Cairo parity pending') : PROD.parity.cases + ' Cairo parity cases'), 'Rated/noted samples: ' + records.length].concat(records.map(function (r) {
     var p = r.production;
     return (r.s ? r.s.toUpperCase() : 'NOTE') + ' ' + p.title + ' ' + JSON.stringify(p.input) + ' [source ' + p.revision + ', build ' + p.identity + ', player ' + p.player + ']' + (r.n ? ' - ' + r.n.replace(/\s+/g, ' ') : '');
   }));
@@ -168,7 +168,7 @@ function initSampler() {
   $('sample-next').addEventListener('click', function () { sampleStep(1); });
   $('sample-next-seed').addEventListener('click', function () { try { var n = BigInt($('sample-seed').value); $('sample-seed').value = (n + 1n).toString(); showSample(sampleRead()); } catch (e) { $('sample-error').hidden = false; $('sample-error').textContent = 'Enter a decimal or hexadecimal seed first.'; } });
   sampleControls(store.sample || { sid: 1, kind: 'species', fx: 0, name: 0, edition: 1, seed: '1' });
-  $('sample-source').textContent = 'Reference engine ' + PROD.revision.slice(0, 7) + ' · ' + (PROD.candidate ? 'candidate audition; Cairo parity pending' : PROD.parity.cases + ' samples checked against Cairo') + ' · TinySynth ' + D.meta.playerVersion + '. Audio is generated on your device, with no wallet or purchase.';
+  $('sample-source').textContent = 'Reference engine ' + PROD.revision.slice(0, 7) + ' · ' + (PROD.candidate ? (PROD.parity.cases ? PROD.parity.cases + ' samples checked against Cairo; musical approval pending' : 'candidate audition; Cairo parity pending') : PROD.parity.cases + ' samples checked against Cairo') + ' · TinySynth ' + D.meta.playerVersion + '. Audio is generated on your device, with no wallet or purchase.';
 }
 initSampler();
 window.addEventListener('hashchange', function () {

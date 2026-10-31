@@ -16,9 +16,24 @@ const candidate = process.argv.includes('--candidate');
 const outputDir = candidate ? 'candidate' : 'production';
 const out = path.join(root, outputDir);
 fs.mkdirSync(out, { recursive: true });
-// Candidate auditions are isolated from the qualified production build and never claim parity.
-const parity = candidate ? { cases: 0, result: 'Candidate audition; Cairo parity pending' } : JSON.parse(fs.readFileSync(path.join(out, 'parity.json'), 'utf8'));
-if (!candidate && (parity.revision !== source.revision || parity.adapterHash !== source.adapterHash || parity.casesHash !== sha256(JSON.stringify(cases())))) throw new Error('Run production-parity.mjs against this source and adapter before building');
+// Candidate auditions stay isolated from production, with explicit qualification status.
+const proofPath = path.join(out, 'parity.json');
+const proof = fs.existsSync(proofPath) ? JSON.parse(fs.readFileSync(proofPath, 'utf8')) : null;
+const qualified = proof && proof.revision === source.revision && proof.adapterHash === source.adapterHash
+  && proof.cases === cases().length && proof.casesHash === sha256(JSON.stringify(cases()));
+if (!candidate && !qualified) throw new Error('Run production-parity.mjs against this source and adapter before building');
+const parity = qualified ? proof : { cases: 0, result: 'Candidate audition; Cairo parity pending' };
+if (process.argv.includes('--refresh-proof')) {
+  if (!candidate || !qualified) throw new Error('Refreshing candidate proof requires matching complete Cairo parity');
+  const file = path.join(out, 'manifest.json'), manifest = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const worker = fs.readFileSync(path.join(root, manifest.worker)), data = fs.readFileSync(path.join(root, manifest.data));
+  const identity = 'candidate-' + sha256(source.revision + source.adapterHash + sha256(worker) + sha256(data)).slice(0, 20);
+  if (!manifest.candidate || manifest.revision !== source.revision || manifest.adapterHash !== source.adapterHash || manifest.identity !== identity) throw new Error('Rebuild the candidate before refreshing proof: source or assets changed');
+  manifest.parity = parity;
+  fs.writeFileSync(file, JSON.stringify(manifest, null, 2) + '\n');
+  console.log(`Candidate proof refreshed: ${source.revision.slice(0, 7)}, ${parity.cases} identical Cairo cases`);
+  process.exit(0);
+}
 
 const settings = {};
 for (let type = 0; type < 3; type++) for (const mega of [0, 1]) {

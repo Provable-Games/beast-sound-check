@@ -94,7 +94,7 @@ try {
   await notesVisible();
   console.log('PASS default sampler, all species/styles/names, one player, phone layout');
   if (built.production.candidate) {
-    assert.match(await page.locator('#sample-source').textContent(), /candidate audition; Cairo parity pending/);
+    assert.match(await page.locator('#sample-source').textContent(), built.production.parity.cases ? /samples checked against Cairo; musical approval pending/ : /candidate audition; Cairo parity pending/);
     assert.match(built.production.identity, /^candidate-/);
   }
   const checks = Array.from({ length: 75 }, (_, i) => ({ sid: i + 1, kind: 'check', fx: 0, name: 0 }));
