@@ -9,13 +9,13 @@ Switching modes retains the selected species and preset. Both modes reuse one po
 
 The default mode is Sound Check. Existing links such as `/#64-0` still open the Species Song. Use `/#check-64-0` for the included Cyclops Sound Check, or `/#check-1-0` to start at Warlock. Preset 0 is a technical default, not evidence of an artistic preference.
 
-Serve this directory, initially on the review port:
+The reviewed combined page is served locally on port 8791. To run it:
 
 ```sh
-python3 -m http.server 8792 --bind 127.0.0.1 --directory species-presets
+python3 -m http.server 8791 --bind 127.0.0.1 --directory species-presets
 ```
 
-Port 8791 is handed over only after review; other listening labs stay untouched.
+Port 8792 was used for testing before the approved handoff. The 8790 candidate and 8789 historical labs stay untouched.
 
 ## Sources and proof
 
@@ -34,7 +34,7 @@ All600 complete SMFs and settings are parsed during generation. `tools/species-p
 With the server running:
 
 ```sh
-AUDITION_URL=http://127.0.0.1:8792 LD_LIBRARY_PATH=/tmp/beasts-browser-runtime/root/usr/lib/x86_64-linux-gnu node tools/species-preset-browser.mjs
+AUDITION_URL=http://127.0.0.1:8791 LD_LIBRARY_PATH=/tmp/beasts-browser-runtime/root/usr/lib/x86_64-linux-gnu node tools/species-preset-browser.mjs
 ```
 
 The browser check verifies all 600 UI-to-MIDI/settings routes, exact Song preservation, mode/preset persistence, non-silent representative Song/Check audio, single-context/no-overlap behavior, rapid selection, aliases/keyboard, legacy/new links, decoded art and 390px layout. `browser-proof.json` records the result. No wallet, RPC, backend service, deployment or external requests are involved.

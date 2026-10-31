@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import {gunzipSync} from 'node:zlib';
 import {createHash} from 'node:crypto';
 const {chromium}=createRequire(import.meta.url)('/workspace/beasts-v3/node_modules/playwright');
-const origin=process.env.AUDITION_URL||'http://127.0.0.1:8792';
+const origin=process.env.AUDITION_URL||'http://127.0.0.1:8791';
 const root=path.resolve(new URL('..',import.meta.url).pathname),dir=path.join(root,'species-presets');
 const manifest=JSON.parse(fs.readFileSync(path.join(dir,'manifest.json')));
 const data=JSON.parse(gunzipSync(fs.readFileSync(path.join(dir,manifest.data.file))));
