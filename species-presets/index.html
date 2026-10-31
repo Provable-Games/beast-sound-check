@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#151916"><title>Beasts · Species Song presets</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+<script src="synth.js" defer></script><script type="module" src="audition.js"></script>
+</head>
+<body>
+<main>
+<header><div class="eyebrow"><span class="mark">B</span> BEASTS / LISTENING ROOM</div><h1>Species Song presets</h1><p class="intro">75 Beasts. Four performances of every song.</p><p class="source" id="source">Loading the upstream song set…</p></header>
+<div class="workspace">
+<section class="player" aria-label="Active performance">
+<div class="card-wrap"><img id="art" alt="" width="250" height="350"></div>
+<div class="player-controls"><p class="eyebrow" id="number">ORIGINAL 01 / 75</p><h2 id="name">Warlock</h2><p class="details" id="details">Preparing 300 performances…</p>
+<div class="presets" aria-label="Current Beast sound preset"><button data-fx="0" disabled>0 <span>Written</span></button><button data-fx="1" disabled>1 <span>Mega</span></button><button data-fx="2" disabled>2 <span>Echo</span></button><button data-fx="3" disabled>3 <span>Mega + echo</span></button></div>
+<div class="transport"><button id="play" class="primary" disabled>Play</button><button id="stop" disabled>Stop</button><button id="previous" aria-label="Previous species" disabled>←</button><button id="next" aria-label="Next species" disabled>→</button></div>
+<div class="progress"><span id="progress"></span></div><div class="play-status"><span id="status" role="status">Loading…</span><span id="time">0:00</span></div>
+<label class="volume">Volume <input id="volume" type="range" min="0" max="100" value="100" aria-label="Volume"></label>
+<p class="hint">Tap any preset to play from the beginning. ← → change preset; ↑ ↓ change Beast. Space pauses.</p>
+</div>
+</section>
+<section class="catalogue" aria-label="All species and presets"><div class="catalogue-top"><label for="search">FIND A BEAST</label><span id="count">75 species · 300 samples</span><input id="search" type="search" placeholder="Search name or number…" autocomplete="off"></div><div class="column-head"><span>SPECIES</span><span>0 · Written</span><span>1 · Mega</span><span>2 · Echo</span><span>3 · Both</span></div><div id="rows" aria-label="Species list"></div><p id="empty" hidden>No Beasts match that search.</p></section>
+</div>
+<footer><p><strong>What you’re hearing.</strong> Each song is played as written, without time drift. Presets change performance and synth settings; the regular artwork stays the same. Harpy and Pegasus use their official shared-song swap.</p><p>Preset 0 is the technical normal setting. This page does not establish which preset Casey preferred when tuning the songs. <a href="manifest.json">Source & sample manifest</a> · <a href="NOTICE.txt">Credits</a></p></footer>
+</main>
+</body></html>
