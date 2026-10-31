@@ -203,7 +203,7 @@ const html = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Beast Sound Check</title>
+<title>${data.production.candidate ? 'Candidate · ' : ''}Beast Sound Check</title>
 <meta name="color-scheme" content="light dark">
 <style>
 :root{
@@ -313,7 +313,7 @@ textarea{width:100%;min-height:76px;margin-top:10px;padding:10px;border-radius:1
 <body>
 <main>
 ${BANNER}
-<h1>Beast Sound Check</h1>
+<h1>${data.production.candidate ? 'Candidate · ' : ''}Beast Sound Check</h1>
 <p class="muted" id="intro"></p>
 
 <details class="card global" id="global">

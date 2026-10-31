@@ -110,7 +110,7 @@ try {
     assert.deepEqual(outputs[i].midi, Array.from(expected.midi));
     assert.equal(outputs[i].settings, settingsText(source.settings(expected.settingsKey).value));
   });
-  console.log('PASS browser worker MIDI/settings for all75checks and authored Cyclops/Satori effects');
+  console.log('PASS browser worker MIDI/settings for all75checks and Cyclops/Satori reference selections');
 
 
   for (const kind of ['check', 'name', 'purchase', 'edition']) {
