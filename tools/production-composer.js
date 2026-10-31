@@ -1,6 +1,6 @@
 // Adapter for the pinned midi_fun_contract reference modules. Musical algorithms stay upstream;
 // this resolves the manager's purchased-song shape and performance before those algorithms run.
-export function createProductionComposer({ E, L, V, F, ED, species }) {
+export function createProductionComposer({ E, L, V, F, ED, S, species }) {
   const FIELD = (1n << 251n) + 17n * (1n << 192n) + 1n;
   function normalize(x) {
     const integer = (v, lo, hi, label) => {
@@ -43,6 +43,11 @@ export function createProductionComposer({ E, L, V, F, ED, species }) {
   }
   function song(x, id, name, purchased) {
     const seed = purchased ? BigInt(x.seed) : null, mega = !!(x.fx & 1);
+    if (S && id === 44 && (name === 0 || name === 1)) {
+      let recipe = S.satori411SongInputs(name);
+      if (purchased) recipe = S.satori411PurchasedInputs(recipe, seed);
+      return { midi: S.satori411PerformanceMidi(name, x.fx, seed), settingsKey: 'satori-411', info: { key: L.keyName(recipe.score), authored: true, presets: [0, 15, 17], channels: 4 } };
+    }
     const b = beast(id, name, mega);
     let resolved;
     // Capture the lab's canonical theme/key/treatment options before its legacy channel filter.
@@ -98,7 +103,9 @@ export function createProductionComposer({ E, L, V, F, ED, species }) {
     }
     if (x.kind === 'check') {
       const result = L.soundCheckMidi(beast(x.sid, x.name, mega), E);
-      return { ...result, midi: performCheck(result.midi, x.fx), input: x, settingsKey: `song-${L.speciesType(x.sid)}-${+mega}-0` };
+      // The selected Cyclops reference keeps all eight timbres and its 175 BPM performance.
+      const authored = x.sid === 64 && result.info?.authored;
+      return { ...result, midi: authored ? result.midi : performCheck(result.midi, x.fx), input: x, settingsKey: authored ? 'cyclops-check' : `song-${L.speciesType(x.sid)}-${+mega}-0` };
     }
     const id = x.kind === 'species' ? L.GENESIS_SWAPS[x.sid] || x.sid : x.sid;
     return { ...song(x, id, x.name, x.kind === 'purchase'), input: x };
@@ -127,7 +134,7 @@ function performCheck(midi, fx) {
         if (type === 81) {
           const tempo = Math.max(1, payload[0] * 65536 + payload[1] * 256 + payload[2] - [0, 25000, 30000, 45000][fx]);
           events.push({ time, data: [255, 81, 3, tempo >> 16, (tempo >> 8) & 255, tempo & 255] });
-        } else events.push({ time: type === 47 && Object.keys(ons).length ? events[events.length - 1].time : time, data: bytes.slice(start, at) });
+        } else events.push({ time, data: bytes.slice(start, at) });
       } else {
         const n = (status & 240) === 192 || (status & 240) === 208 ? 1 : 2;
         const originalTime = time, key = bytes[at], velocity = bytes[at + 1], type = status & 240, k = (status & 15) + ':' + key;
@@ -136,7 +143,8 @@ function performCheck(midi, fx) {
           ons[k] = time;
           if (fx === 3 && time % 1920 === 0) data[data.length - 1] = Math.min(115, velocity + 8);
         } else if ((type === 128 || type === 144 && !velocity) && ons[k] !== undefined && fx === 2) {
-          time = ons[k] + Math.max(60, Math.floor((time - ons[k]) * 3 / 4));
+          const duration = time - ons[k];
+          time = ons[k] + Math.min(duration, Math.max(60, Math.floor(duration * 3 / 4)));
         }
         events.push({ time, data });
         // Deltas in the source remain relative to the original time, not the shortened note-off.

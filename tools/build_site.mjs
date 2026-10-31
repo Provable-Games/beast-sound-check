@@ -32,7 +32,7 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const data = JSON.parse(fs.readFileSync(path.join(here, "tracks.json"), "utf8"));
-data.production = JSON.parse(fs.readFileSync(path.join(here, "../production/manifest.json"), "utf8"));
+data.production = JSON.parse(fs.readFileSync(process.env.SAMPLER_MANIFEST || path.join(here, "../production/manifest.json"), "utf8"));
 // OUT may be old/index.html; keep the shared worker reachable from either page.
 data.production.worker = path.relative(path.dirname(path.resolve(process.env.OUT || path.join(here, "../index.html"))), path.join(here, "..", data.production.worker)).split(path.sep).join("/");
 const SAMPLER = fs.readFileSync(path.join(here, "production-sampler.js"), "utf8");

@@ -25,6 +25,20 @@ Composition runs in a Web Worker from the pinned reference modules, with a small
 
 Pass/Fail and notes belong to the exact normalized sample and the content-addressed production build. Exports include species, track kind, effects, name ID, edition, full seed, composer revision and player version. Share the URL to reopen the same sample. Existing engine/Sepolia ratings and `#601`–`#675` links are preserved; new builds retain older sample records in the export, without treating them as ratings of changed audio.
 
+### Launch candidate auditions
+
+The launch changes can be reviewed separately from the Cairo-qualified production build. With a clean candidate `BEAST` checkout and the usual art/player inputs, run:
+
+```sh
+BEAST=/path/to/candidate-midi node tools/build_production.mjs --candidate
+SAMPLER_MANIFEST=candidate/manifest.json OUT=candidate/index.html BEASTS3=/path/to/beasts-v3 OMP_MAIN=/path/to/onchain-midi-player node tools/build_site.mjs
+python3 -m http.server 8790 --bind 127.0.0.1
+```
+
+Open `http://localhost:8790/candidate/`. The engine-test `tools/tracks.json` must already exist as for a normal site build. The page labels the new music as a **candidate audition; Cairo parity pending**, uses a separate content-addressed rating identity and leaves `production/` and the published `index.html` untouched. Cyclops uses its complete eight-sound reference across all effects. Satori's authored Species Song and Agony Bane base keep the original instrument balance; seeded purchases vary the authored base's key and pace. Other named Satori tracks and edition styles keep their existing paths.
+
+Run `node --test tools/production-composer.test.mjs` for adapter regression checks. A production rebuild still requires actual Cairo parity for the full matrix, including the explicit Cyclops named checks and Satori/Agony Bane base/purchase cases. Candidate mode is not a substitute for that qualification.
+
 ### Refresh the production sampler
 
 Use a clean pinned `BEAST` checkout with its `offchain/beast-sound` dependencies installed, plus `OMP` and `BEASTS3` as below. Run the following from this repository. The Cairo fixture runs in a temporary source copy, leaving the working checkout unchanged:

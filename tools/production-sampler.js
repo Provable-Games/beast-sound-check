@@ -92,6 +92,12 @@ function sampleWorker() {
   return worker;
 }
 function sampleDescription(x) {
+  if (PROD.features && PROD.features.cyclopsCheck && x.sid === 64 && x.kind === 'check') {
+    return 'Original lab 504: the whole eight-sound Arp/FX sequence at 175 BPM. Its audio stays fixed across names and effects; the visual preset follows effects ' + x.fx + '. Candidate audio for listening review.';
+  }
+  if (PROD.features && PROD.features.satori411 && x.sid === 44 && (x.kind === 'species' || ((x.kind === 'name' || x.kind === 'purchase') && (x.name === 0 || x.name === 1)))) {
+    return (x.kind === 'purchase' ? 'Seed ' + x.seed + ' varies the key and pace of the authored Satori arrangement.' : 'Original lab 411: the 72-second Satori arrangement, also the base for Agony Bane.') + ' Its triangle, bass, harp and drums retain the original mix. Effects ' + x.fx + ' change expression without replacing the instrument palette. Candidate audio for listening review.';
+  }
   var effects = x.kind === 'check' ? ['as written', 'mega', 'portato', 'mega + accent'] : ['as written', 'mega', 'chip echo / portato', 'mega + chip echo / accent'];
   var a = [SAMPLE_KINDS[x.kind], 'effects ' + x.fx + ' (' + effects[x.fx] + ')'];
   if (x.kind !== 'species') a.push(sampleName(x));
@@ -117,7 +123,7 @@ function showSample(input) {
   $('realctl').hidden = $('engctl').hidden = $('engctl2').hidden = $('lab').hidden = $('labbadge').hidden = true;
   $('ftbadge').hidden = true; $('facts').hidden = true; document.querySelector('.speed').hidden = true;
   $('sample-error').hidden = true;
-  $('kick').textContent = 'Proposed Beast sound · midi_fun_contract ' + PROD.revision.slice(0, 7);
+  $('kick').textContent = (PROD.candidate ? 'Candidate audition · midi_fun_contract ' : 'Proposed Beast sound · midi_fun_contract ') + PROD.revision.slice(0, 7);
   $('ttl').textContent = sampleTitle(input); $('blurb').textContent = sampleDescription(input); $('artinfo').textContent = '';
   $('sample-now').textContent = 'Composing ' + sampleTitle(input) + '…';
   $('checks').textContent = '';
@@ -142,7 +148,7 @@ function sampleRecord() {
 function sampleSummary() {
   var records = Object.keys(store.r).map(function (k) { return store.r[k]; }).filter(function (r) { return r.production && (r.s || r.n); });
   records.sort(function (a, b) { return (a.s === 'fail' ? 0 : 1) - (b.s === 'fail' ? 0 : 1) || a.production.input.sid - b.production.input.sid; });
-  return ['Proposed Beast sound samples', 'Source midi_fun_contract ' + PROD.revision + '; adapter ' + PROD.adapterHash + '; ' + PROD.parity.cases + ' Cairo parity cases', 'Rated/noted samples: ' + records.length].concat(records.map(function (r) {
+  return ['Proposed Beast sound samples', 'Source midi_fun_contract ' + PROD.revision + '; adapter ' + PROD.adapterHash + '; ' + (PROD.candidate ? 'candidate audition; Cairo parity pending' : PROD.parity.cases + ' Cairo parity cases'), 'Rated/noted samples: ' + records.length].concat(records.map(function (r) {
     var p = r.production;
     return (r.s ? r.s.toUpperCase() : 'NOTE') + ' ' + p.title + ' ' + JSON.stringify(p.input) + ' [source ' + p.revision + ', build ' + p.identity + ', player ' + p.player + ']' + (r.n ? ' - ' + r.n.replace(/\s+/g, ' ') : '');
   }));
@@ -162,7 +168,7 @@ function initSampler() {
   $('sample-next').addEventListener('click', function () { sampleStep(1); });
   $('sample-next-seed').addEventListener('click', function () { try { var n = BigInt($('sample-seed').value); $('sample-seed').value = (n + 1n).toString(); showSample(sampleRead()); } catch (e) { $('sample-error').hidden = false; $('sample-error').textContent = 'Enter a decimal or hexadecimal seed first.'; } });
   sampleControls(store.sample || { sid: 1, kind: 'species', fx: 0, name: 0, edition: 1, seed: '1' });
-  $('sample-source').textContent = 'Reference engine ' + PROD.revision.slice(0, 7) + ' · ' + PROD.parity.cases + ' samples checked against Cairo · TinySynth ' + D.meta.playerVersion + '. Audio is generated on your device, with no wallet or purchase.';
+  $('sample-source').textContent = 'Reference engine ' + PROD.revision.slice(0, 7) + ' · ' + (PROD.candidate ? 'candidate audition; Cairo parity pending' : PROD.parity.cases + ' samples checked against Cairo') + ' · TinySynth ' + D.meta.playerVersion + '. Audio is generated on your device, with no wallet or purchase.';
 }
 initSampler();
 window.addEventListener('hashchange', function () {
