@@ -22,7 +22,16 @@
 <p class="hint">Tap any preset to play from the beginning. ← → change preset; ↑ ↓ change Beast. Space pauses.</p>
 </div>
 </section>
+<div class="inspection">
+<section class="midi-panel" id="midi-panel" aria-label="MIDI visualization">
+<div class="midi-heading"><div><p class="eyebrow">NOTE INSPECTION</p><h2>MIDI piano roll</h2></div><div class="midi-views" role="group" aria-label="Piano roll view"><button data-roll="follow" aria-pressed="true">Follow</button><button data-roll="full" aria-pressed="false">Full track</button></div></div>
+<div class="midi-meta"><p class="midi-caption">Loading notes…</p><span class="midi-window"></span></div>
+<canvas role="img" aria-label="MIDI piano roll loading"></canvas>
+<div class="midi-legend" aria-label="MIDI channel colors"></div><p class="midi-detail">Hover a note for pitch, velocity and length.</p>
+<p class="midi-help">Note lengths show MIDI gates; synth releases and pitch effects can extend or reshape the sound. Drums appear below the pitched notes.</p>
+</section>
 <section class="catalogue" aria-label="All species and presets"><div class="catalogue-top"><label for="search">FIND A BEAST</label><span id="count">75 species · 300 samples</span><input id="search" type="search" placeholder="Search name or number…" autocomplete="off"></div><div class="column-head" id="column-head"><span>SPECIES</span><span>0 · Written</span><span>1 · Mega</span><span>2 · Echo</span><span>3 · Both</span></div><div id="rows" aria-label="Species list"></div><p id="empty" hidden>No Beasts match that search.</p></section>
+</div>
 </div>
 <footer><p id="what"><strong>What you’re hearing.</strong> Each song is played as written, without time drift. Presets change performance and synth settings; the regular artwork stays the same. Harpy and Pegasus use their official shared-song swap.</p><p>Preset 0 is the technical normal setting. This page does not establish which preset Casey preferred when tuning the songs. <a href="manifest.json">Source & sample manifest</a> · <a href="NOTICE.txt">Credits</a></p></footer>
 </main>

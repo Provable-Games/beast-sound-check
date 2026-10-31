@@ -1,10 +1,12 @@
 import { createSynth, installSettings, decodeSettings } from './settings.js';
+import { MidiRoll } from './midi-roll.mjs';
 const $ = id => document.getElementById(id);
 const modeLabels = { song:['Written','Mega','Echo','Mega + echo'], check:['Written','Mega','Portato','Mega/accent'] };
 const labels = (sid = state.sid) => state.kind === 'check' && sid === 64 ? ['Fixed504','Fixed504','Fixed504','Fixed504'] : modeLabels[state.kind];
 const title = () => state.kind === 'check' ? 'Sound Check' : 'Species Song';
 const state = { kind:'check', sid: 1, fx: 0, status: 'stopped', serial: 0, synth: null, data: null, current: null, volume: 1 };
 window.audition = state;
+const roll = new MidiRoll($('midi-panel'));
 const clock = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 const bytes = text => Uint8Array.from(atob(text), c => c.charCodeAt(0));
 const settingsCache = new Map();
@@ -42,6 +44,7 @@ function stop() {
   ++state.serial;
   state.synth?.stopMIDI();
   state.status = 'stopped';
+  state.playbackStart = null; roll.setTick(0, false);
   status('Stopped');
   $('progress').style.width = '0%'; $('time').textContent = '0:00';
   render();
@@ -64,6 +67,10 @@ function playSelected() {
       if (request !== state.serial) return;
       synth.loadMIDI(bytes(sample.midi_b64));
       synth.setLoop(1); synth.setLoopEnd(synth.getPlayStatus().maxTick); synth.playMIDI();
+      // curTick is the synth's scheduling cursor, which can lead audible notes.
+      // Use its public start time and AudioContext clock so pause freezes the
+      // roll and loop boundaries stay aligned with what reaches the speakers.
+      state.playbackStart = synth.getPlayStatus().startTime;
       state.status = 'playing'; status(`${sample.fx} · ${labels()[sample.fx]} · Playing`); render();
     }).catch(error => failed(error, request));
   } catch (error) { failed(error, request); }
@@ -71,6 +78,7 @@ function playSelected() {
 function failed(error, request) {
   if (request !== state.serial) return;
   state.status = 'stopped'; state.synth?.stopMIDI(); render();
+  state.playbackStart = null; roll.setTick(0, false);
   status(`Tap Play to start audio: ${error.message || error}`);
 }
 function select(sid, fx, play = true, kind = state.kind) {
@@ -78,6 +86,8 @@ function select(sid, fx, play = true, kind = state.kind) {
   ++state.serial; state.synth?.stopMIDI(); state.status = 'stopped';
   state.kind = kind; state.sid = sid; state.fx = fx; state.current = state.lookup.get(`${kind}-${sid}-${fx}`);
   if (!state.current) throw new Error('Missing sample selection');
+  state.playbackStart = null;
+  state.midi = roll.setMidi(bytes(state.current.midi_b64), `${state.current.name} · ${title()} · ${labels()[fx]}`);
   $('progress').style.width = '0%'; $('time').textContent = '0:00';
   status(`${fx} · ${labels()[fx]} · Ready`); render();
   if (play) playSelected();
@@ -148,11 +158,17 @@ try {
   }
   const initial = fromHash(); select(initial.sid,initial.fx,false,initial.kind);
   window.addEventListener('hashchange',()=>{const x=fromHash();if(x.kind!==state.kind || x.sid!==state.sid || x.fx!==state.fx)select(x.sid,x.fx,false,x.kind);});
-  setInterval(() => {
-    if (!state.synth || !['playing','paused'].includes(state.status)) return;
-    const s = state.synth.getPlayStatus(), fraction = Math.min(1, Math.max(0, s.curTick / s.maxTick));
-    $('progress').style.width = `${fraction * 100}%`; $('time').textContent = clock(fraction * state.current.seconds);
-  }, 120);
+  let lastFrame = 0;
+  function animate(now) {
+    requestAnimationFrame(animate);
+    if (now - lastFrame < 33 || !state.synth || !['playing','paused'].includes(state.status) || state.playbackStart == null) return;
+    lastFrame = now;
+    const elapsed = Math.max(0, state.synth.getAudioContext().currentTime - state.playbackStart);
+    const seconds = elapsed % state.midi.duration, tick = state.midi.secondsToTick(seconds);
+    roll.setTick(tick, state.status === 'playing');
+    $('progress').style.width = `${seconds / state.midi.duration * 100}%`; $('time').textContent = clock(seconds);
+  }
+  requestAnimationFrame(animate);
 } catch (error) {
   status(error.message); $('source').textContent = 'Samples unavailable'; $('details').textContent = 'Reload to try again.';
 }
