@@ -48,9 +48,45 @@ const frame = () => page.frames().find(f => f !== page.mainFrame());
 const source = await productionSource();
 const built = JSON.parse(fs.readFileSync(path.join(root, samplePage), 'utf8').match(/<script[^>]+id="data"[^>]*>([\s\S]*?)<\/script>/)[1]);
 const rendition = JSON.parse(fs.readFileSync(path.join(root, 'renditions', built.sepolia.sets[0].dir, 'manifest.json'), 'utf8'));
-async function notesVisible() {
+async function cardReady() {
   await page.locator('#pw').scrollIntoViewIfNeeded();
   await frame().waitForSelector('#play:not([disabled])');
+  await frame().waitForFunction(() => {
+    const image = document.getElementById('beast-art');
+    return image?.complete && image.naturalWidth > 0;
+  });
+  await frame().locator('#beast-art').evaluate(async image => {
+    await image.decode();
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+  const visible = await frame().evaluate(() => {
+    const image = document.getElementById('beast-art'), button = document.getElementById('play');
+    const art = image.getBoundingClientRect(), play = button.getBoundingClientRect();
+    return { art: art.toJSON(), play: play.toJSON(), imageVisible: getComputedStyle(image).visibility === 'visible', buttonVisible: getComputedStyle(button).visibility === 'visible', width: innerWidth, height: innerHeight };
+  });
+  assert(visible.imageVisible && visible.art.width > 100 && visible.art.height > 100);
+  assert(visible.buttonVisible && visible.play.width >= 16 && visible.play.height >= 16);
+  assert(visible.play.left >= 0 && visible.play.top >= 0 && visible.play.right <= visible.width && visible.play.bottom <= visible.height);
+}
+async function renderedCardPixels() {
+  const png = await frame().locator('#beast-art').screenshot();
+  const pixels = await page.evaluate(async base64 => {
+    const image = new Image(); image.src = 'data:image/png;base64,' + base64; await image.decode();
+    const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height;
+    const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0);
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let nonblack = 0, colored = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const high = Math.max(data[i], data[i + 1], data[i + 2]);
+      if (high > 20) nonblack++;
+      if (high - Math.min(data[i], data[i + 1], data[i + 2]) > 25) colored++;
+    }
+    return { nonblack, colored, total: data.length / 4 };
+  }, png.toString('base64'));
+  assert(pixels.nonblack / pixels.total > 0.1 && pixels.colored > 100, 'Beast card must render beyond the initial black iframe');
+}
+async function notesVisible() {
+  await cardReady();
   const preset = +await page.locator('#sample-fx').inputValue();
   const expected = !!((rendition.renderer.notesPresets >> preset) & 1);
   assert.equal(await frame().locator('script#beast-notes').count(), +expected);
@@ -127,8 +163,8 @@ try {
     for (const key of ['sample-64-check-0-0-0-0', 'sample-44-species-0-0-0-0', 'sample-44-name-0-1-0-0']) {
       console.log('Playing reference', key);
       await page.goto(origin + '/' + samplePage + '#' + key); await ready(); await matches();
-      await page.locator('#pw').scrollIntoViewIfNeeded();
-      await frame().waitForSelector('#play:not([disabled])'); await frame().locator('#play').click();
+      await cardReady(); await renderedCardPixels();
+      await frame().locator('#play').click();
       await frame().waitForFunction(() => {
         if (!window.__outputAnalysers || window.__audioContext?.state !== 'running') return false;
         return window.__outputAnalysers.some(analyser => {
@@ -139,7 +175,7 @@ try {
       }, null, { timeout: 15000 });
       await frame().locator('#play').click();
     }
-    console.log('PASS non-silent player output for Cyclops504, Satori411 and Agony Bane');
+    console.log('PASS visible Beast/play controls and non-silent output for Cyclops504, Satori411 and Agony Bane');
     await page.goto(origin + '/' + samplePage); await ready();
   }
 
