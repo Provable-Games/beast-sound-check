@@ -10,6 +10,7 @@ import { productionSource } from './production-source.mjs';
 const root = path.resolve(new URL('..', import.meta.url).pathname);
 const pw = createRequire(import.meta.url)(process.env.PLAYWRIGHT_CORE || '/workspace/beasts-v3/node_modules/playwright');
 const browserName = process.env.PLAYWRIGHT_BROWSER || 'chromium';
+const samplePage = process.env.SAMPLE_PAGE || 'index.html';
 const server = http.createServer((req, res) => {
   const file = path.resolve(root, '.' + new URL(req.url, 'http://local').pathname.replace(/\/$/, '/index.html'));
   if (!file.startsWith(root + '/') || !fs.existsSync(file)) { res.writeHead(404).end(); return; }
@@ -33,7 +34,7 @@ const ready = async (text) => {
 };
 const frame = () => page.frames().find(f => f !== page.mainFrame());
 const source = await productionSource();
-const built = JSON.parse(fs.readFileSync(path.join(root, 'index.html'), 'utf8').match(/<script[^>]+id="data"[^>]*>([\s\S]*?)<\/script>/)[1]);
+const built = JSON.parse(fs.readFileSync(path.join(root, samplePage), 'utf8').match(/<script[^>]+id="data"[^>]*>([\s\S]*?)<\/script>/)[1]);
 const rendition = JSON.parse(fs.readFileSync(path.join(root, 'renditions', built.sepolia.sets[0].dir, 'manifest.json'), 'utf8'));
 async function notesVisible() {
   await page.locator('#pw').scrollIntoViewIfNeeded();
@@ -63,12 +64,14 @@ const notesPixels = () => frame().evaluate(() => {
 });
 async function matches() {
   const input = await page.evaluate(() => JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k => k.startsWith('beast-sound-check-')))).sample);
-  const expected = Buffer.from(source.composer.compose(input).midi).toString('base64');
+  const result = source.composer.compose(input), expected = Buffer.from(result.midi).toString('base64');
   assert.equal(await frame().locator('#onchain-midi-data').textContent(), expected);
+  const { settingsText } = await import((process.env.OMP || '/workspace/onchain-midi-player') + '/scripts/segments.mjs');
+  assert.equal(await frame().locator('#onchain-midi-settings').textContent(), settingsText(source.settings(result.settingsKey).value));
   return input;
 }
 try {
-  await page.goto(origin + '/'); await ready(/Warlock/);
+  await page.goto(origin + '/' + samplePage); await ready(/Warlock/);
   assert.equal(await page.locator('#sample-species option').count(), 75);
   assert.equal(await page.locator('#sample-style option').count(), 23);
   assert.equal(await page.locator('#sample-prefix option').count(), 70);
@@ -78,6 +81,37 @@ try {
   await matches();
   await notesVisible();
   console.log('PASS default sampler, all species/styles/names, one player, phone layout');
+  if (built.production.candidate) {
+    assert.match(await page.locator('#sample-source').textContent(), /candidate audition; Cairo parity pending/);
+    assert.match(built.production.identity, /^candidate-/);
+  }
+  const checks = Array.from({ length: 75 }, (_, i) => ({ sid: i + 1, kind: 'check', fx: 0, name: 0 }));
+  for (const fx of [0, 1, 2, 3]) {
+    checks.push({ sid: 64, kind: 'check', fx, name: 1242 });
+    for (const kind of ['species', 'name', 'purchase']) checks.push({ sid: 44, kind, fx, name: 1, seed: '0' });
+  }
+  const outputs = await page.evaluate(async ({ worker, inputs }) => {
+    const w = new Worker(new URL(worker, location.href));
+    try {
+      return await Promise.all(inputs.map((input, request) => new Promise((resolve, reject) => {
+        const listener = event => {
+          if (event.data.request !== request) return;
+          w.removeEventListener('message', listener);
+          if (event.data.error) reject(new Error(event.data.error));
+          else resolve({ midi: Array.from(event.data.midi), settings: event.data.settings });
+        };
+        w.addEventListener('message', listener); w.postMessage({ request, input });
+      })));
+    } finally { w.terminate(); }
+  }, { worker: built.production.worker, inputs: checks });
+  const { settingsText } = await import((process.env.OMP || '/workspace/onchain-midi-player') + '/scripts/segments.mjs');
+  checks.forEach((input, i) => {
+    const expected = source.composer.compose(input);
+    assert.deepEqual(outputs[i].midi, Array.from(expected.midi));
+    assert.equal(outputs[i].settings, settingsText(source.settings(expected.settingsKey).value));
+  });
+  console.log('PASS browser worker MIDI/settings for all75checks and authored Cyclops/Satori effects');
+
 
   for (const kind of ['check', 'name', 'purchase', 'edition']) {
     await page.selectOption('#sample-kind', kind); await ready();
@@ -136,7 +170,7 @@ try {
   assert.equal((await matches()).sid, 2);
   console.log('PASS invalid input leaves the current sample intact; rapid changes show the latest sample');
 
-  await page.goto(origin + '/#beast-01-genesis');
+  await page.goto(origin + '/' + samplePage + '#beast-01-genesis');
   await page.waitForFunction(() => document.querySelector('#pw iframe') && document.getElementById('kick').textContent.includes('Beasts on Sepolia'), null, { timeout: 30000 });
   assert.equal(await page.locator('#bp').isDisabled(), false);
   await page.selectOption('#sample-kind', 'species'); await ready();

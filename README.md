@@ -31,13 +31,13 @@ The launch changes can be reviewed separately from the Cairo-qualified productio
 
 ```sh
 BEAST=/path/to/candidate-midi node tools/build_production.mjs --candidate
-SAMPLER_MANIFEST=candidate/manifest.json OUT=candidate/index.html BEASTS3=/path/to/beasts-v3 OMP_MAIN=/path/to/onchain-midi-player node tools/build_site.mjs
+SAMPLER_MANIFEST=candidate/manifest.json OUT=launch-candidate.html BEASTS3=/path/to/beasts-v3 OMP_MAIN=/path/to/onchain-midi-player node tools/build_site.mjs
 python3 -m http.server 8790 --bind 127.0.0.1
 ```
 
-Open `http://localhost:8790/candidate/`. The engine-test `tools/tracks.json` must already exist as for a normal site build. The page labels the new music as a **candidate audition; Cairo parity pending**, uses a separate content-addressed rating identity and leaves `production/` and the published `index.html` untouched. Cyclops uses its complete eight-sound reference across all effects. Satori's authored Species Song and Agony Bane base keep the original instrument balance; seeded purchases vary the authored base's key and pace. Other named Satori tracks and edition styles keep their existing paths.
+Open `http://localhost:8790/launch-candidate.html`. The engine-test `tools/tracks.json` must already exist as for a normal site build. The page labels the new music as a **candidate audition; Cairo parity pending**, uses a separate content-addressed rating identity and leaves `production/` and the published `index.html` untouched. Cyclops uses its complete eight-sound reference across all effects. Satori's authored Species Song and Agony Bane base keep the original instrument balance; seeded purchases vary the authored base's key and pace. Other named Satori tracks and edition styles keep their existing paths.
 
-Run `node --test tools/production-composer.test.mjs` for adapter regression checks. A production rebuild still requires actual Cairo parity for the full matrix, including the explicit Cyclops named checks and Satori/Agony Bane base/purchase cases. Candidate mode is not a substitute for that qualification.
+Run `node --test tools/production-composer.test.mjs` for adapter regression checks. Set `SAMPLE_PAGE=launch-candidate.html` when running `tools/production-smoke.mjs` to check the candidate page. A production rebuild still requires actual Cairo parity for the full matrix, including the explicit Cyclops named checks and Satori/Agony Bane base/purchase cases. Candidate mode is not a substitute for that qualification.
 
 ### Refresh the production sampler
 
