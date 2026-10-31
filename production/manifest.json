@@ -2,9 +2,9 @@
   "schema": "beast-production-sampler/v1",
   "revision": "e9b0f66c67c5d6ba1755753ad712d3a20f95ee00",
   "adapterHash": "3bed767f41b280550a685edd399afdc36b0622c0e90b4d6c18dada33cb6dd551",
-  "worker": "production/composer-add18d2ae2b18652.js",
+  "worker": "production/composer-4f85391e27d469c7.js",
   "data": "production/data-c8211b3d0dbe51c2.json.gz",
-  "identity": "8b9799db223a06e0e1b3",
+  "identity": "16132dcfddc59b244733",
   "species": [
     {
       "id": 1,
@@ -545,6 +545,6 @@
     "cases": 1611,
     "result": "identical MIDI bytes and Cairo settings hashes"
   },
-  "workerBytes": 128135,
+  "workerBytes": 128069,
   "dataBytes": 219831
 }

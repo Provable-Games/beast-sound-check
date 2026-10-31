@@ -72,10 +72,13 @@ function sampleWorker() {
     for (var i = 0; i < midi.length - 5; i++) if (midi[i] === 255 && midi[i + 1] === 81 && midi[i + 2] === 3) { tempo = midi[i + 3] * 65536 + midi[i + 4] * 256 + midi[i + 5]; break; }
     var b64 = function (bytes) { var s = ''; for (var j = 0; j < bytes.length; j += 8192) s += String.fromCharCode.apply(null, bytes.subarray(j, j + 8192)); return btoa(s); };
     var svg = b64(new TextEncoder().encode(r.svg)), data = '<script type="text/plain" id="onchain-midi-settings">' + r.settings + '</scr' + 'ipt><script type="text/plain" id="onchain-midi-data">' + b64(midi) + '</scr' + 'ipt>';
-    audition.html = F.head + F.gunzip + F.player + F.body + '<img id="beast-art" alt="" src="data:image/svg+xml;base64,' + svg + '">' + data + F.notes + F.footer;
+    var page = PROD.page.fragments;
+    // Sampler presets pair the visual and sound effects, as the Sepolia rendition tokens do.
+    var notesOn = !!((PROD.notesPresets >> r.input.fx) & 1);
+    audition.html = page.head + F.gunzip + F.player + page.body + '<img id="beast-art" alt="" src="data:image/svg+xml;base64,' + svg + '">' + data + (notesOn ? page.notes : '') + page.footer;
     $('ttl').textContent = sampleTitle(r.input);
     $('sample-now').textContent = 'Now sampling: ' + sampleTitle(r.input) + ' · effects ' + r.input.fx;
-    $('artinfo').textContent = (60000000 / tempo).toFixed(1).replace(/\.0$/, '') + ' BPM · ' + midi.length + ' MIDI bytes · ' + (r.input.fx & 1 ? 'Shiny' : 'Regular') + ' Beast';
+    $('artinfo').textContent = (60000000 / tempo).toFixed(1).replace(/\.0$/, '') + ' BPM · ' + midi.length + ' MIDI bytes · ' + (r.input.fx & 1 ? 'Shiny' : 'Regular') + ' Beast · Visual preset ' + r.input.fx + ': MIDI notes ' + (notesOn ? 'on' : 'off');
     $('blurb').textContent = sampleDescription(r.input);
     $('bp').disabled = $('bf').disabled = $('note').disabled = false;
     rateUi(store.r[sampleRatingKey(r.input)]);

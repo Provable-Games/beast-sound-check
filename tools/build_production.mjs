@@ -61,7 +61,8 @@ self.onmessage = async event => {
       .replaceAll('__PREFIX__', esc(nm.prefix ? table.prefixes[nm.prefix - 1] : ''))
       .replaceAll('__SUFFIX__', esc(nm.suffix ? table.suffixes[nm.suffix - 1] : ''))
       .replaceAll('__TITLE__', esc(title));
-    if (x.fx < 2) svg = svg.replace(/ data-notes-bg(?:='[^']*'|="[^"]*")?/g, '');
+    // Keep the renderer's inert notes marker on the card. The page includes the notes module
+    // only when the visual preset supports it, according to the Sepolia rendition manifest.
     self.postMessage({ request, input: x, midi: result.midi, settings: shared.settings[result.settingsKey], svg, info: result.info }, [result.midi.buffer]);
   } catch(e) { self.postMessage({ request, error: e.message || String(e) }); }
 };`, resolveDir: root, sourcefile: 'production-worker.js' }, bundle: true, write: false, platform: 'browser', format: 'iife', target: 'es2020', minify: true, legalComments: 'eof' });
@@ -80,5 +81,5 @@ fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify(manifest, null,
 // Old content-addressed builds can be removed: the current site references this build only.
 for (const file of fs.readdirSync(out)) if (/^(?:composer-[a-f0-9]+\.js|data-[a-f0-9]+\.json\.gz)$/.test(file) && ![workerFile, dataFile].includes(file)) fs.unlinkSync(path.join(out, file));
 const licenses = [source.root + '/LICENSE', ...['@scure/starknet', '@noble/curves', '@noble/hashes'].map(p => source.bs + '/node_modules/' + p + '/LICENSE')];
-fs.writeFileSync(path.join(out, 'NOTICE.txt'), 'Beast Sound reference engine: https://github.com/caseywescott/midi_fun_contract at ' + source.revision + '\n\n' + licenses.map(p => p.split('/').slice(-3).join('/') + '\n' + fs.readFileSync(p, 'utf8')).join('\n\n'));
+fs.writeFileSync(path.join(out, 'NOTICE.txt'), 'Beast Sound reference engine: https://github.com/caseywescott/midi_fun_contract at ' + source.revision + '\n\n' + licenses.map((p, i) => (i ? p.split('/').slice(-3).join('/') : 'midi_fun_contract/LICENSE') + '\n' + fs.readFileSync(p, 'utf8')).join('\n\n'));
 console.log(`Production sampler: ${source.revision.slice(0, 7)}, ${source.styles.length} styles; worker ${js.length} B, shared data ${payload.length} B; ${parity.cases} Cairo parity cases`);

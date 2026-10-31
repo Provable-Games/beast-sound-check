@@ -33,6 +33,34 @@ const ready = async (text) => {
 };
 const frame = () => page.frames().find(f => f !== page.mainFrame());
 const source = await productionSource();
+const built = JSON.parse(fs.readFileSync(path.join(root, 'index.html'), 'utf8').match(/<script[^>]+id="data"[^>]*>([\s\S]*?)<\/script>/)[1]);
+const rendition = JSON.parse(fs.readFileSync(path.join(root, 'renditions', built.sepolia.sets[0].dir, 'manifest.json'), 'utf8'));
+async function notesVisible() {
+  await page.locator('#pw').scrollIntoViewIfNeeded();
+  await frame().waitForSelector('#play:not([disabled])');
+  const preset = +await page.locator('#sample-fx').inputValue();
+  const expected = !!((rendition.renderer.notesPresets >> preset) & 1);
+  assert.equal(await frame().locator('script#beast-notes').count(), +expected);
+  if (!expected) {
+    assert.equal(await frame().locator('canvas').count(), 0);
+    return;
+  }
+  await frame().waitForFunction(() => {
+    const c = document.querySelector('canvas');
+    if (!c || !c.width || !c.height) return false;
+    const p = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    for (let i = 0; i < p.length; i += 4) if (p[i + 3] && Math.max(p[i], p[i + 1], p[i + 2]) - Math.min(p[i], p[i + 1], p[i + 2]) > 10) return true;
+    return false;
+  }, null, { timeout: 15000 });
+  assert.equal(await frame().locator('#beast-art').evaluate(e => e.localName), 'img');
+  assert.equal(await frame().locator('canvas').count(), 1);
+}
+const notesPixels = () => frame().evaluate(() => {
+  const c = document.querySelector('canvas'), pixels = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+  let hash = 2166136261;
+  for (const byte of pixels) hash = Math.imul(hash ^ byte, 16777619) >>> 0;
+  return hash;
+});
 async function matches() {
   const input = await page.evaluate(() => JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k => k.startsWith('beast-sound-check-')))).sample);
   const expected = Buffer.from(source.composer.compose(input).midi).toString('base64');
@@ -48,12 +76,13 @@ try {
   assert.equal(await page.locator('iframe').count(), 1);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   await matches();
+  await notesVisible();
   console.log('PASS default sampler, all species/styles/names, one player, phone layout');
 
   for (const kind of ['check', 'name', 'purchase', 'edition']) {
     await page.selectOption('#sample-kind', kind); await ready();
     if (kind !== 'check') { await page.selectOption('#sample-prefix', '69'); await ready(); await page.selectOption('#sample-suffix', '18'); await ready(); }
-    for (const fx of ['0', '1', '2', '3']) { await page.selectOption('#sample-fx', fx); await ready(); await matches(); }
+    for (const fx of ['0', '1', '2', '3']) { await page.selectOption('#sample-fx', fx); await ready(); await matches(); await notesVisible(); }
   }
   console.log('PASS all official track types and sound effects match the production adapter');
 
@@ -72,7 +101,17 @@ try {
   await frame().waitForSelector('#play:not([disabled])', { timeout: 20000 });
   await frame().locator('#play').click();
   await frame().waitForFunction(() => window.__audioContext?.state === 'running', null, { timeout: 15000 });
+  const playingNotes = await notesPixels();
+  await page.waitForTimeout(350);
+  assert.notEqual(await notesPixels(), playingNotes);
+  await page.locator('#pw').screenshot({ path: '/tmp/beast-sound-midi-preview-' + browserName + '.png' });
   await frame().locator('#play').click();
+  await frame().waitForFunction(() => window.OnchainMidiPlayer.getPlayStatus().state === 'paused');
+  await page.waitForTimeout(100);
+  const pausedNotes = await notesPixels();
+  await page.waitForTimeout(350);
+  assert.equal(await notesPixels(), pausedNotes);
+  console.log('PASS Sepolia visual notes mask: no notes for 0/1, scrolling and pause-freeze for 2/3');
   await page.click('#bf'); await page.locator('#note').fill('Sampler regression note'); await page.locator('#note').blur();
   const ratedUrl = page.url();
   await page.click('#sample-next-seed'); await ready();
