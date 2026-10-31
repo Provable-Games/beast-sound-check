@@ -30,7 +30,7 @@ await context.addInitScript(() => {
       const result = connect.call(this, destination, ...args);
       if (destination === this.context.destination) {
         const analyser = this.context.createAnalyser(); analyser.fftSize = 512;
-        connect.call(this, analyser); window.__outputAnalyser = analyser;
+        connect.call(this, analyser); (window.__outputAnalysers ||= []).push(analyser);
       }
       return result;
     };
@@ -125,14 +125,17 @@ try {
   console.log('PASS browser worker MIDI/settings for all75checks and Cyclops/Satori reference selections');
   if (built.production.features?.cyclopsCheck && built.production.features?.satori411) {
     for (const key of ['sample-64-check-0-0-0-0', 'sample-44-species-0-0-0-0', 'sample-44-name-0-1-0-0']) {
+      console.log('Playing reference', key);
       await page.goto(origin + '/' + samplePage + '#' + key); await ready(); await matches();
       await page.locator('#pw').scrollIntoViewIfNeeded();
       await frame().waitForSelector('#play:not([disabled])'); await frame().locator('#play').click();
       await frame().waitForFunction(() => {
-        if (!window.__outputAnalyser || window.__audioContext?.state !== 'running') return false;
-        const samples = new Float32Array(window.__outputAnalyser.fftSize);
-        window.__outputAnalyser.getFloatTimeDomainData(samples);
-        return samples.some(sample => Math.abs(sample) > 0.00001);
+        if (!window.__outputAnalysers || window.__audioContext?.state !== 'running') return false;
+        return window.__outputAnalysers.some(analyser => {
+          const samples = new Float32Array(analyser.fftSize);
+          analyser.getFloatTimeDomainData(samples);
+          return samples.some(sample => Math.abs(sample) > 0.00001);
+        });
       }, null, { timeout: 15000 });
       await frame().locator('#play').click();
     }
@@ -209,7 +212,7 @@ try {
   console.log('PASS deployed references remain available, returning to the sampler, no page errors or external services');
 } catch (error) {
   console.error('Page errors:', errors);
-  console.error('Player:', await frame()?.evaluate(() => ({ play: document.getElementById('play')?.outerHTML, style: document.getElementById('play') && getComputedStyle(document.getElementById('play')).cssText, art: document.getElementById('beast-art') && { loaded: document.getElementById('beast-art').complete, width: document.getElementById('beast-art').naturalWidth }, text: document.body.innerText.slice(-1000) })).catch(() => null));
+  console.error('Player:', await frame()?.evaluate(() => ({ audio: window.__audioContext?.state, analysers: window.__outputAnalysers?.length, play: document.getElementById('play')?.outerHTML, style: document.getElementById('play') && getComputedStyle(document.getElementById('play')).cssText, art: document.getElementById('beast-art') && { loaded: document.getElementById('beast-art').complete, width: document.getElementById('beast-art').naturalWidth }, text: document.body.innerText.slice(-1000) })).catch(() => null));
   await page.screenshot({ path: '/tmp/beast-sound-sampler-error.png' });
   throw error;
 } finally { await browser.close(); server.close(); }
