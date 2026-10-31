@@ -30,3 +30,8 @@ test('sampler leaves other named Satori and edition tracks on their existing pat
   const edition = source.composer.compose({ sid: 44, kind: 'edition', name: 1, fx: 0, edition: 1, seed: '0' });
   assert.match(edition.settingsKey, /^edition-/);
 });
+
+test('sampler labels use the curated catalogue canonical names', options, () => {
+  assert.equal(source.TABLES.species[52], 'Asag');
+  assert.equal(source.TABLES.species[69], 'Metsavana');
+});

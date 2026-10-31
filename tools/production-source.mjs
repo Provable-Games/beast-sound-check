@@ -17,6 +17,9 @@ export async function productionSource() {
   const SS = await import(bs + '/onchain/tinychip/synth_settings.mjs');
   const satoriPath = path.join(bs, 'src/satori411.js');
   const S = fs.existsSync(satoriPath) ? await import(satoriPath) : undefined;
+  const cataloguePath = path.join(bs, 'src/sound_check_catalogue_data.js');
+  const catalogue = fs.existsSync(cataloguePath) ? (await import(cataloguePath)).CHECK_CATALOGUE : null;
+  const TABLES = catalogue ? { ...idx.TABLES, species: idx.TABLES.species.map((name, i) => catalogue[i]?.species === i + 1 ? catalogue[i].name : name) } : idx.TABLES;
   // Read the actual generated Cairo table: six signed degree nibbles and tonic per species.
   const cairo = fs.readFileSync(root + '/beasts/beast_composer/src/composition/editions_data.cairo', 'utf8');
   const packed = cairo.match(/pub const SPECIES:[^=]+?=\s*\[([\s\S]*?)\];/)[1].match(/0x[0-9a-f]+/gi).map(BigInt);
@@ -45,5 +48,5 @@ export async function productionSource() {
     ...(SS.cyclopsSoundCheckSynthSettings ? ['cyclops-check'] : []),
     ...(S && SS.satori411SynthSettings ? ['satori-411'] : []),
   ];
-  return { root, bs, extraSettingsKeys, satoriPath: S ? satoriPath : null, revision: git('rev-parse', 'HEAD'), adapterHash: sha256(fs.readFileSync(new URL('./production-composer.js', import.meta.url))), composer, settings, species, TABLES: idx.TABLES, styles: ED.STYLES.map((s, i) => ({ index: i, key: s.key, label: s.label, description: s.desc })) };
+  return { root, bs, extraSettingsKeys, satoriPath: S ? satoriPath : null, revision: git('rev-parse', 'HEAD'), adapterHash: sha256(fs.readFileSync(new URL('./production-composer.js', import.meta.url))), composer, settings, species, TABLES, styles: ED.STYLES.map((s, i) => ({ index: i, key: s.key, label: s.label, description: s.desc })) };
 }
