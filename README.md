@@ -1,5 +1,7 @@
 # Beast Sound Check
 
+The local [combined listening lab](species-presets/README.md) has **Species Song** and **Sound Check** modes: the same 75 Beasts with four presets per mode, including Cyclops at species 64. The original 300 Casey Song samples are preserved; the 300 implemented Sound Check candidates have independent Cairo capture comparisons.
+
 A phone-first listening test for the proposed production sound of all 75 original Beasts. The default **Sample all 75 Beasts** panel composes official Sound Checks, Species Songs, named songs and generated custom tracks on your device. Deployed Sepolia token pages and the synthetic engine tests remain available as references.
 
 The sampler uses midi_fun_contract `e9b0f66` (v1.0.0) and onchain-midi-player 0.12.0 / pocket-synth v2.1.2. Its adapter is checked against the actual Cairo composer: **1,611 cases have identical MIDI bytes and synth-settings hashes**. The existing 75 Species Songs also match this production composer.

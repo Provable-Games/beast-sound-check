@@ -187,3 +187,26 @@ Vendored demo controls (not part of the synthesizer or npm package):
 
 Audition music source: cdcad0a4b5d6ef4f3ddb6555f3448cbb017766e1
 Player: Apache-2.0, webaudio-tinysynth by Tatsuya Shinyagaito, Provable Games pocket-synth v2.1.2 and onchain-midi-player v0.12.0. See synth.js license header.
+
+Implemented Sound Check candidate source: https://github.com/loothero/midi_fun_contract at 03083a867195824a8a0152e46df7bb367587e55d
+MIT License
+
+Copyright (c) 2024-2026 Casey Wescott
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

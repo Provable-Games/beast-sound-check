@@ -1,65 +1,86 @@
 {
   "browser": "Chromium",
-  "url": "http://127.0.0.1:8791",
+  "url": "http://127.0.0.1:8792",
+  "dataSha256": "34ada423d00e54a657ae03b13584fd53b3dc9160815cddbf5ebf153fa10c65ae",
+  "samples": 600,
+  "modes": [
+    "song",
+    "check"
+  ],
   "checks": [
-    "75 species, 300 preset buttons, no external player or horizontal overflow",
-    "nine parent-button selections produce non-silent audio, all four presets, one AudioContext",
-    "fixed regular art, rapid switching settles latest selection; Stop clears every old note",
-    "pause/resume retains the primed context",
-    "name/alias search, species stepping preserves preset, keyboard preset changes preserve species",
-    "390px mobile layout and preset control; screenshots wait for decoded art and enabled controls",
-    "zero browser JavaScript errors and zero external network requests"
+    "all600 UI selections resolve exact MIDI/settings;75rows/300buttons per mode;one Cyclops row;one context and latest request wins",
+    "both modes and all Song presets produce non-silent audio; Cyclops complete504 and another portato Check play through the persistent synth",
+    "mode switches preserve species/preset/fixed art and use accurate Song echo vs Check portato labels",
+    "Stop clears old notes; pause/resume reuses the same context without overlap",
+    "search/aliases/keyboard remain available; legacy#64-0 is Song and#check-64-3 is the included Cyclops candidate",
+    "390px mobile layout fits both modes; art decoded and visible before screenshots",
+    "zero browser errors and zero external network requests"
   ],
   "peaks": [
     {
+      "kind": "check",
+      "sid": 1,
+      "fx": 0,
+      "peak": 0.06643511354923248
+    },
+    {
+      "kind": "song",
       "sid": 1,
       "fx": 0,
       "peak": 0.3910827338695526
     },
     {
+      "kind": "song",
       "sid": 1,
       "fx": 1,
       "peak": 0.3910827338695526
     },
     {
+      "kind": "song",
       "sid": 1,
       "fx": 2,
-      "peak": 0.13628028333187103
+      "peak": 0.26718661189079285
     },
     {
+      "kind": "song",
       "sid": 1,
       "fx": 3,
       "peak": 0.37087512016296387
     },
     {
+      "kind": "song",
       "sid": 44,
       "fx": 0,
       "peak": 0.37087512016296387
     },
     {
-      "sid": 44,
-      "fx": 3,
-      "peak": 0.25366711616516113
+      "kind": "check",
+      "sid": 64,
+      "fx": 0,
+      "peak": 0.05262811854481697
     },
     {
-      "sid": 68,
+      "kind": "check",
+      "sid": 64,
       "fx": 3,
-      "peak": 0.37604355812072754
+      "peak": 0.052533574402332306
     },
     {
-      "sid": 39,
+      "kind": "check",
+      "sid": 2,
       "fx": 2,
-      "peak": 0.37604355812072754
+      "peak": 0.051161374896764755
     },
     {
-      "sid": 40,
+      "kind": "check",
+      "sid": 44,
       "fx": 1,
-      "peak": 0.3626110553741455
+      "peak": 0.024223221465945244
     }
   ],
   "screenshots": [
-    "/tmp/beast-species-presets-desktop.png",
-    "/tmp/beast-species-presets-mobile.png"
+    "/tmp/beast-song-check-desktop.png",
+    "/tmp/beast-song-check-mobile.png"
   ],
   "javascriptErrors": [],
   "externalRequests": []

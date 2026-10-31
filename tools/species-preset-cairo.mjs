@@ -4,7 +4,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
 const dir = path.resolve(new URL('../species-presets', import.meta.url).pathname);
-const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json')));
+// Keep the original Song capture bound to its unchanged300-sample segment.
+const reference = fs.existsSync(path.join(dir, 'species-song-manifest.json')) ? 'species-song-manifest.json' : 'manifest.json';
+const manifest = JSON.parse(fs.readFileSync(path.join(dir, reference)));
 const cases = [1,39,40,44,68].flatMap(sid => [0,1,2,3].map(fx => ({sid,fx})));
 if (process.argv[2] === 'cairo') {
   process.stdout.write(`use beast_composer::composition::generation::get_generation_inputs;
