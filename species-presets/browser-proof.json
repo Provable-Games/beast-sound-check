@@ -1,7 +1,7 @@
 {
   "browser": "Chromium",
   "url": "http://127.0.0.1:8791",
-  "dataSha256": "34ada423d00e54a657ae03b13584fd53b3dc9160815cddbf5ebf153fa10c65ae",
+  "dataSha256": "a4bd4ba45f44bcb593ee71ce0caf409a3c434804c7412f2a72821e7507fd6750",
   "samples": 600,
   "modes": [
     "song",
@@ -51,7 +51,7 @@
       "kind": "song",
       "sid": 44,
       "fx": 0,
-      "peak": 0.27072036266326904
+      "peak": 0.37087512016296387
     },
     {
       "kind": "check",
@@ -62,20 +62,32 @@
     {
       "kind": "check",
       "sid": 64,
-      "fx": 3,
+      "fx": 1,
       "peak": 0.05262811854481697
+    },
+    {
+      "kind": "check",
+      "sid": 64,
+      "fx": 2,
+      "peak": 0.05262811854481697
+    },
+    {
+      "kind": "check",
+      "sid": 64,
+      "fx": 3,
+      "peak": 0.06138543412089348
     },
     {
       "kind": "check",
       "sid": 2,
       "fx": 2,
-      "peak": 0.051161374896764755
+      "peak": 0.06138543412089348
     },
     {
       "kind": "check",
       "sid": 44,
       "fx": 1,
-      "peak": 0.046445395797491074
+      "peak": 0.05982109531760216
     }
   ],
   "screenshots": [

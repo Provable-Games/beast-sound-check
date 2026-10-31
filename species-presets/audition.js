@@ -2,7 +2,7 @@ import { createSynth, installSettings, decodeSettings } from './settings.js';
 import { MidiRoll } from './midi-roll.mjs';
 const $ = id => document.getElementById(id);
 const modeLabels = { song:['Written','Mega','Echo','Mega + echo'], check:['Written','Mega','Portato','Mega/accent'] };
-const labels = (sid = state.sid) => state.kind === 'check' && sid === 64 ? ['Fixed504','Fixed504','Fixed504','Fixed504'] : modeLabels[state.kind];
+const labels = () => modeLabels[state.kind];
 const title = () => state.kind === 'check' ? 'Sound Check' : 'Species Song';
 const state = { kind:'check', sid: 1, fx: 0, status: 'stopped', serial: 0, synth: null, data: null, current: null, volume: 1 };
 window.audition = state;
@@ -23,7 +23,7 @@ function render() {
   const mode = state.manifest.modes[state.kind];
   $('source').textContent = state.kind === 'check' ? `Sound Check candidates · ${mode.sourceRevision.slice(0,7)} · 300 / 300 ready · Listening approval pending` : `Casey upstream Species Songs · ${mode.sourceRevision.slice(0,7)} · As written · 300 / 300 ready`;
   $('mode-note').textContent = s.fixedReference || (state.kind === 'check' ? 'Proposed warm-up · No chip echo · Pending listening approval' : 'Raw Casey Species Song · No time drift');
-  $('what').textContent = state.kind === 'check' ? 'Sound Check candidates use the implemented launch scores. Cyclops is species 64 within this same set of 75 and keeps its whole eight-sound original 504 loop at 175 BPM across all four presets. Checks have no chip echo.' : 'Each upstream Species Song is played as written, without time drift. Presets change performance and synth settings; the regular artwork stays the same. Harpy and Pegasus use their official shared-song swap.';
+  $('what').textContent = state.kind === 'check' ? 'Sound Check candidates use the implemented launch scores. Cyclops is species 64 within this same set of 75. Its four distinct performances retain the whole eight-sound original 504 sequence; Written is the exact 175 BPM reference. Checks have no chip echo.' : 'Each upstream Species Song is played as written, without time drift. Presets change performance and synth settings; the regular artwork stays the same. Harpy and Pegasus use their official shared-song swap.';
   document.querySelectorAll('[data-kind]').forEach(button => button.setAttribute('aria-pressed',String(button.dataset.kind === state.kind)));
   document.querySelectorAll('.presets [data-fx] span').forEach((span,fx)=>span.textContent=labels()[fx]);
   document.querySelectorAll('.species-row [data-fx]').forEach(button=>button.setAttribute('aria-label',`${state.data.species[+button.dataset.sid-1].name}, ${title()}, preset ${button.dataset.fx}, ${labels(+button.dataset.sid)[+button.dataset.fx]}`));

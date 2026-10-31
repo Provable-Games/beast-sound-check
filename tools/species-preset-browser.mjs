@@ -44,7 +44,7 @@ try{
  assert.equal(await page.evaluate(()=>window.__lastLoaded),data.samples.find(s=>s.kind==='check'&&s.sid===75&&s.fx===3).midi_b64);
  assert.equal(await page.evaluate(()=>window.__contexts.length),1);
  pass('all600 UI selections resolve exact MIDI/settings;75rows/300buttons per mode;one Cyclops row;one context and latest request wins');
- for(const [kind,sid,fx]of [['song',1,0],['song',1,1],['song',1,2],['song',1,3],['song',44,0],['check',64,0],['check',64,3],['check',2,2],['check',44,1]])await audible(kind,sid,fx);
+ for(const [kind,sid,fx]of [['song',1,0],['song',1,1],['song',1,2],['song',1,3],['song',44,0],['check',64,0],['check',64,1],['check',64,2],['check',64,3],['check',2,2],['check',44,1]])await audible(kind,sid,fx);
  pass('both modes and all Song presets produce non-silent audio; Cyclops complete504 and another portato Check play through the persistent synth');
  const current=await page.evaluate(()=>({sid:audition.sid,fx:audition.fx,art:document.getElementById('art').src}));
  await page.locator('[data-kind="song"]').click();assert.equal(await page.evaluate(()=>audition.sid),current.sid);assert.equal(await page.evaluate(()=>audition.fx),current.fx);assert.equal(await page.locator('#art').getAttribute('src'),current.art);
@@ -57,7 +57,8 @@ try{
  await page.locator('#search').fill('Balrog');assert.equal(await page.locator('.species-row:visible .species-title').textContent(),'Asag');await page.locator('#search').fill('Ent');assert.equal(await page.locator('.species-row[data-sid="70"]').isVisible(),true);await page.locator('#search').fill('');
  await page.locator('#next').click();assert.equal(await page.evaluate(()=>audition.sid),45);assert.equal(await page.evaluate(()=>audition.fx),1);await page.locator('#previous').click();await page.keyboard.press('ArrowLeft');assert.equal(await page.evaluate(()=>audition.sid),44);assert.equal(await page.evaluate(()=>audition.fx),0);
  await page.goto(origin+'/#64-0');await ready();assert.equal(await page.evaluate(()=>audition.kind),'song');assert.equal(await page.evaluate(()=>audition.sid),64);
- await page.goto(origin+'/#check-64-3');await ready();assert.equal(await page.evaluate(()=>audition.kind),'check');assert.equal(await page.evaluate(()=>audition.fx),3);assert.match(await page.locator('#mode-note').textContent(),/eight sounds|eight-sound/);assert.match(await page.locator('.presets [data-fx="3"]').textContent(),/Fixed504/);
+ await page.goto(origin+'/#check-64-3');await ready();assert.equal(await page.evaluate(()=>audition.kind),'check');assert.equal(await page.evaluate(()=>audition.fx),3);assert.match(await page.locator('#mode-note').textContent(),/eight sounds|eight-sound/);assert.match(await page.locator('.presets [data-fx="3"]').textContent(),/Mega\/accent/);assert.doesNotMatch(await page.locator('.presets').textContent(),/Fixed504/);
+ assert.equal(new Set(data.samples.filter(s=>s.kind==='check'&&s.sid===64).map(s=>s.midiSha256)).size,4);
  pass('search/aliases/keyboard remain available; legacy#64-0 is Song and#check-64-3 is the included Cyclops candidate');
  await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:'/tmp/beast-song-check-desktop.png'});
  await page.setViewportSize({width:390,height:844});await page.locator('#art').evaluate(img=>img.decode());await page.waitForTimeout(100);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);const box=await page.locator('#art').boundingBox();assert(box.width>80&&box.height>100);await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:'/tmp/beast-song-check-mobile.png'});

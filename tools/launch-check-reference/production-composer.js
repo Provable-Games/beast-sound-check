@@ -103,9 +103,9 @@ export function createProductionComposer({ E, L, V, F, ED, S, species }) {
     }
     if (x.kind === 'check') {
       const result = L.soundCheckMidi(beast(x.sid, x.name, mega), E);
-      // The selected Cyclops reference keeps all eight timbres and its 175 BPM performance.
+      // Cyclops keeps all eight reference timbres; its performance follows the selected effect.
       const authored = x.sid === 64 && result.info?.authored;
-      return { ...result, midi: authored ? result.midi : performCheck(result.midi, x.fx), input: x, settingsKey: authored ? 'cyclops-check' : `song-${L.speciesType(x.sid)}-${+mega}-0` };
+      return { ...result, midi: performCheck(result.midi, x.fx), input: x, settingsKey: authored ? 'cyclops-check' : `song-${L.speciesType(x.sid)}-${+mega}-0` };
     }
     const id = x.kind === 'species' ? L.GENESIS_SWAPS[x.sid] || x.sid : x.sid;
     return { ...song(x, id, x.name, x.kind === 'purchase'), input: x };

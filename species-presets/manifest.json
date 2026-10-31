@@ -26,17 +26,17 @@
     "check": {
       "label": "Sound Check",
       "sourceRepository": "https://github.com/loothero/midi_fun_contract",
-      "sourceRevision": "03083a867195824a8a0152e46df7bb367587e55d",
+      "sourceRevision": "036b30cddc4988ef06bcb8a66c24d808f393f4e8",
       "samples": 300,
-      "adapterHash": "641752b7bc7ef687e5f4ea2b1db29bfe78c690e8eaab9ab3a2210e13d658bce4",
+      "adapterHash": "00d753eb2e18307892791bf5dc37482ae2ba80e493a035bb9402c1137903d3da",
       "cairoProof": "check-cairo-proof.json",
       "scope": "75 implemented Sound Check candidates, four raw token sound presets each. Cyclops64 is the whole original504 sequence and is included in the75; musical approval pending. No chip echo."
     }
   },
   "data": {
-    "file": "samples-34ada423d00e54a6.json.gz",
-    "sha256": "34ada423d00e54a657ae03b13584fd53b3dc9160815cddbf5ebf153fa10c65ae",
-    "bytes": 1138839,
+    "file": "samples-a4bd4ba45f44bcb5.json.gz",
+    "sha256": "a4bd4ba45f44bcb593ee71ce0caf409a3c434804c7412f2a72821e7507fd6750",
+    "bytes": 1139290,
     "samples": 600,
     "species": 75,
     "presets": [
@@ -70,8 +70,9 @@
     "sha256": "44a3eb6140a14a8dfdfbf89fb1feb77eae5604946877d0c138dfb907b83f8154"
   },
   "generatorHashes": {
-    "tools/build-species-presets.mjs": "62afa0b0f5b8678256da1aba7db93a74f3de90423c2fa8e0ab76bd76666fc188",
-    "tools/launch-check-reference/production-composer.js": "641752b7bc7ef687e5f4ea2b1db29bfe78c690e8eaab9ab3a2210e13d658bce4",
+    "tools/build-species-presets.mjs": "cf3029f3f825bada667929ffe575cc60f3ecf4014a32976e815b7b37a547751a",
+    "tools/sound-check-parity.mjs": "d044199a0ead586b840a81e9d0321e9482efbf277e8c6c8f6547ce7768e5163a",
+    "tools/launch-check-reference/production-composer.js": "00d753eb2e18307892791bf5dc37482ae2ba80e493a035bb9402c1137903d3da",
     "tools/launch-check-reference/production-source.mjs": "9962300e52080ff9389c22f11ddfb707dc7aebddfb832d5dd953201f10349a0b",
     "tools/launch-check-reference/production-cases.mjs": "04e5c40c17aedd65f6989db2655bf03cbd3863a08cfb2d04965b46d9f9a55feb"
   },
@@ -6716,11 +6717,11 @@
       "kind": "check",
       "sid": 64,
       "fx": 1,
-      "midiSha256": "03783872ada54c91052ceb70fb80f35b4553702256ee589695c9eb09e6ce2ecb",
+      "midiSha256": "5d3a31d2ee5e7ea95e3b1855a2fc6a44aaea411af253f435a41671269ee25eba",
       "settingsHash": "1108417554220817045226828215319430766609848967835564788421662880481852126668",
       "settingsSha256": "66158f76d1c47037c01baf69f06b2fa5a3949d40c3a5b520c0f0433dc196f070",
       "bytes": 735,
-      "tempoUs": 342857,
+      "tempoUs": 317857,
       "notes": 72,
       "settingsKey": "check/cyclops-check"
     },
@@ -6728,11 +6729,11 @@
       "kind": "check",
       "sid": 64,
       "fx": 2,
-      "midiSha256": "03783872ada54c91052ceb70fb80f35b4553702256ee589695c9eb09e6ce2ecb",
+      "midiSha256": "713c4425d134b18817ad64f081ad0f7db13f431a08e8810f8039818fcf5961a2",
       "settingsHash": "1108417554220817045226828215319430766609848967835564788421662880481852126668",
       "settingsSha256": "66158f76d1c47037c01baf69f06b2fa5a3949d40c3a5b520c0f0433dc196f070",
-      "bytes": 735,
-      "tempoUs": 342857,
+      "bytes": 767,
+      "tempoUs": 312857,
       "notes": 72,
       "settingsKey": "check/cyclops-check"
     },
@@ -6740,11 +6741,11 @@
       "kind": "check",
       "sid": 64,
       "fx": 3,
-      "midiSha256": "03783872ada54c91052ceb70fb80f35b4553702256ee589695c9eb09e6ce2ecb",
+      "midiSha256": "a307f20abec558591b4f43218a3e1ac2ba00f07d023b2f24c7ef4fb654d369b2",
       "settingsHash": "1108417554220817045226828215319430766609848967835564788421662880481852126668",
       "settingsSha256": "66158f76d1c47037c01baf69f06b2fa5a3949d40c3a5b520c0f0433dc196f070",
       "bytes": 735,
-      "tempoUs": 342857,
+      "tempoUs": 297857,
       "notes": 72,
       "settingsKey": "check/cyclops-check"
     },
