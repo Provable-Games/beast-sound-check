@@ -24,6 +24,18 @@ const context = await browser.newContext({ viewport: { width: 390, height: 844 }
 await context.addInitScript(() => {
   const AC = window.AudioContext;
   if (AC) window.AudioContext = new Proxy(AC, { construct(target, args) { const c = new target(...args); window.__audioContext = c; return c; } });
+  if (window.AudioNode) {
+    const connect = AudioNode.prototype.connect;
+    AudioNode.prototype.connect = function (destination, ...args) {
+      const result = connect.call(this, destination, ...args);
+      if (destination === this.context.destination) {
+        const analyser = this.context.createAnalyser(); analyser.fftSize = 512;
+        connect.call(this, analyser); window.__outputAnalyser = analyser;
+      }
+      return result;
+    };
+  }
+
 });
 const page = await context.newPage(), errors = [], external = [];
 page.on('pageerror', e => errors.push(e.message));
@@ -111,6 +123,23 @@ try {
     assert.equal(outputs[i].settings, settingsText(source.settings(expected.settingsKey).value));
   });
   console.log('PASS browser worker MIDI/settings for all75checks and Cyclops/Satori reference selections');
+  if (built.production.features?.cyclopsCheck && built.production.features?.satori411) {
+    for (const key of ['sample-64-check-0-0-0-0', 'sample-44-species-0-0-0-0', 'sample-44-name-0-1-0-0']) {
+      await page.goto(origin + '/' + samplePage + '#' + key); await ready(); await matches();
+      await page.locator('#pw').scrollIntoViewIfNeeded();
+      await frame().waitForSelector('#play:not([disabled])'); await frame().locator('#play').click();
+      await frame().waitForFunction(() => {
+        if (!window.__outputAnalyser || window.__audioContext?.state !== 'running') return false;
+        const samples = new Float32Array(window.__outputAnalyser.fftSize);
+        window.__outputAnalyser.getFloatTimeDomainData(samples);
+        return samples.some(sample => Math.abs(sample) > 0.00001);
+      }, null, { timeout: 15000 });
+      await frame().locator('#play').click();
+    }
+    console.log('PASS non-silent player output for Cyclops504, Satori411 and Agony Bane');
+    await page.goto(origin + '/' + samplePage); await ready();
+  }
+
 
 
   for (const kind of ['check', 'name', 'purchase', 'edition']) {
