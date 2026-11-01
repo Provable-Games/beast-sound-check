@@ -1,6 +1,6 @@
 # Beast Sound Check
 
-The local [combined listening lab](species-presets/README.md) has **Species Song** and **Sound Check** modes: the same 75 Beasts with four presets per mode, including Cyclops at species 64. The original 300 Casey Song samples are preserved; the 300 implemented Sound Check candidates have independent Cairo capture comparisons.
+The [launch listening lab](species-presets/README.md) has **Species Song** and **Sound Check** modes for all 75 Beasts, with four presets per mode, a MIDI piano roll and production-synchronized animation. Satori uses the selected original #411 Species Song; Cyclops includes the complete #504 Sound Check with four distinct performances. The original Casey reference is retained separately. This static review page is published at `/species-presets/`; Name Song selection is being added separately. The root sampler below already supports Name Songs.
 
 A phone-first listening test for the proposed production sound of all 75 original Beasts. The default **Sample all 75 Beasts** panel composes official Sound Checks, Species Songs, named songs and generated custom tracks on your device. Deployed Sepolia token pages and the synthetic engine tests remain available as references.
 
