@@ -66,6 +66,8 @@ The Node check covers all 600 actual tempos and decoded frame pixels, the strict
 
 `names/manifest.json` separately pins the proposed production source, adapter, source-tree digest, official name table, worker and compressed settings-bank hashes. It leaves the existing 600 samples, their manifest/proofs, settings installer, synth, artwork, MIDI roll and production art helper unchanged. The browser verifies the worker and bank SHA-256 before use. All assets are relative static files, including when served under `/species-presets/`; no RPC, wallet, remote API or backend is involved.
 
+Name metadata initializes only when that mode is selected. A missing or aborted Name manifest leaves the 600 baseline choices available; named deep links show a Name-only unavailable state, and Play retries without reload. While composition is pending or unavailable, the roll hides previous note content and labels the selected name/status. Reduced motion retains the production first-frame still throughout these states.
+
 One worker composes only requested Name Songs. It keeps at most one running request and one queued latest selection, plus a 24-result cache. The player initializes/resumes its persistent context synchronously during the user gesture, using an existing safe bank while composition is pending. It installs the canonical returned settings before loading the generated MIDI. Selection and playback tokens prevent older worker, image or resume results from starting or replacing a newer selection. Failed named composition leaves the 600 static choices usable and can be retried. A generated track’s real MIDI header/duration drives the piano roll and existing production art clock.
 
 Rebuild with a clean source checkout at exactly the pinned revision and installed Node dependencies:
@@ -96,3 +98,11 @@ AUDITION_URL=http://127.0.0.1:8794/species-presets LD_LIBRARY_PATH=/tmp/beasts-b
 ```
 
 The browser compares the actual shipped worker outputs/settings to all 332 Cairo capture fingerprints, routes all 300 stratified choices through the real UI/piano roll, and checks first-click audio while the worker is delayed, non-silent playback, bounded worker/cache, selector/name/FX/mode persistence, stale worker/resume/image results, stop while composing, retry after transport failure, a real full named Yeti loop, exact art beat policy, reduced motion, invalid/share/reload URLs, 390px layout, one AudioContext, no JavaScript errors and no external requests. `names/browser-proof.json` records these results. Existing browser/art/MIDI-roll suites continue to cover the unchanged 600 static performances.
+
+Name loading/error regressions can be run independently:
+
+```sh
+AUDITION_URL=http://127.0.0.1:8794/species-presets LD_LIBRARY_PATH=/tmp/beasts-browser-runtime/root/usr/lib/x86_64-linux-gnu node tools/name-song-loading-browser.mjs
+```
+
+This check covers 404/aborted Name manifests, base-mode recovery and named deep links, retry without reload, reduced-motion artwork during a delayed/failed composition, and hidden stale piano-roll content with accurate selected-name/status text. Results are in `names/loading-browser-proof.json`.

@@ -1,0 +1,12 @@
+{
+  "browser": "Chromium",
+  "url": "http://127.0.0.1:8794/species-presets",
+  "checks": [
+    "404 Name manifest leaves all 75 rows/600 base choices available, handles named deep links, and retries without reload",
+    "abort Name manifest leaves all 75 rows/600 base choices available, handles named deep links, and retries without reload",
+    "delayed composition keeps the production reduced-motion first-frame still and hides the previous Sound Check roll/title/notes",
+    "failed composition retains the still and an accurate unavailable roll; Play retry restores the new named notes and playback",
+    "zero JavaScript errors across optional manifest failures, pending composition and retry"
+  ],
+  "errors": []
+}

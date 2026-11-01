@@ -20,9 +20,9 @@ function mountArt() {
   // Namespace each helper's r=N URLs across selections, including a return to
   // the same species/tempo. Only the media type changes; the SVG bytes do not.
   img.src = state.data.art[state.sid].replace(';base64,', `;selection=${++artSelection};base64,`);
-  img.alt = `${state.current.name}, regular Beast card`;
-  const midi = bytes(state.current.midi_b64);
-  artControls = restartImgOnPass(img, timing, { beat:s => beatSeconds(s, midi) });
+  img.alt = `${selectedTitle()}, regular Beast card`;
+  const midi = state.current ? bytes(state.current.midi_b64) : null;
+  artControls = restartImgOnPass(img, timing, { beat:s => midi ? beatSeconds(s, midi) : null });
   const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   if (reduced) artControls.pause();
   artSync = syncSvgToMusic(null, timing, { img:reduced ? null : artControls });
@@ -38,14 +38,27 @@ function settings(sample) {
   return settingsCache.get(key);
 }
 function selectedName() {
+  if(!state.namesManifest)return `Name #${state.nameVariant}`;
   const n=state.nameVariant-1;
   return `${state.namesManifest.prefixes[Math.floor(n/18)]} ${state.namesManifest.suffixes[n%18]}`;
 }
 function selectedTitle() { return `${state.kind==='name' ? selectedName()+' ' : ''}${state.data.species[state.sid-1].name}`; }
-function clearArt() {
-  artSync?.dispose();artSync=null;artControls?.();artControls=null;
-  $('art').src=state.data.art[state.sid].replace(';base64,',`;selection=${++artSelection};base64,`);
-  $('art').alt=`${selectedTitle()}, regular Beast card`;
+// Name Song is optional: load its metadata only when selected. Failure resets
+// this promise so Play can retry while the 600 baseline choices remain usable.
+let namesLoading;
+function ensureNames() {
+  if(!namesLoading) namesLoading=(async()=>{
+    const response=await fetch('names/manifest.json');
+    if(!response.ok)throw new Error('Could not load Name Song manifest');
+    const manifest=await response.json();
+    state.namesManifest=manifest;state.names=new NameSongs(manifest);
+    for(const [id,values] of [['name-prefix',manifest.prefixes],['name-suffix',manifest.suffixes]]) {
+      const control=$(id);control.replaceChildren();
+      values.forEach((value,i)=>{const option=document.createElement('option');option.value=i+1;option.textContent=value;control.append(option)});
+      control.disabled=false;
+    }
+  })().catch(error=>{namesLoading=null;throw error});
+  return namesLoading;
 }
 
 function status(text) { $('status').textContent = text; }
@@ -56,9 +69,17 @@ function render() {
   $('details').textContent = !state.current ? (state.composing ? 'Composing on your device…' : 'Name Song unavailable · Tap Play to retry') : `${s.key} · ${(60000000 / s.tempoUs).toFixed(1).replace(/\.0$/, '')} BPM · ${clock(s.seconds)}`;
   const mode = state.kind==='name' ? state.namesManifest : state.manifest.modes[state.kind];
   const authored = state.kind === 'song' && mode.overrides?.find(x=>x.sid===s.sid);
-  $('source').textContent = state.kind === 'name' ? `Production Name Songs · ${mode.revision.slice(0,7)} · 1,242 official names · Composed locally` : state.kind === 'check' ? `Sound Check candidates · ${mode.sourceRevision.slice(0,7)} · 300 / 300 ready · Listening approval pending` : authored ? `Satori · Original lab 411 · ${authored.sourceRevision.slice(0,7)} · 4 / 4 ready` : `Casey upstream Species Songs · ${mode.sourceRevision.slice(0,7)} · Satori uses original 411 · 300 / 300 ready`;
+  $('source').textContent = state.kind === 'name' ? (mode ? `Production Name Songs · ${mode.revision.slice(0,7)} · 1,242 official names · Composed locally` : state.composing ? 'Loading Name Song names…' : 'Name Song unavailable · Tap Play to retry; Species Song and Sound Check remain available') : state.kind === 'check' ? `Sound Check candidates · ${mode.sourceRevision.slice(0,7)} · 300 / 300 ready · Listening approval pending` : authored ? `Satori · Original lab 411 · ${authored.sourceRevision.slice(0,7)} · 4 / 4 ready` : `Casey upstream Species Songs · ${mode.sourceRevision.slice(0,7)} · Satori uses original 411 · 300 / 300 ready`;
   $('mode-note').textContent = s.fixedReference || (state.kind==='name' ? 'Canonical species theme · Official name’s key and style · No time drift' : state.kind === 'check' ? 'Proposed warm-up · No chip echo · Pending listening approval' : 'Casey Species Song · No time drift');
   $('what').textContent = state.kind==='name' ? 'Name Songs use the production NamedSong recipe: the species’ theme in the official name’s key and style. Some names share the Species Song’s notes. Satori’s Agony Bane uses the derived C-Aeolian arrangement; Yeti keeps its special arrangement. Harpy and Pegasus use their own species here. The regular artwork stays the same.' : state.kind === 'check' ? 'Sound Check candidates use the implemented launch scores. Cyclops is species 64 within this same set of 75. Its four distinct performances retain the whole eight-sound original 504 sequence; Written is the exact 175 BPM reference. Checks have no chip echo.' : 'Satori uses the selected original lab411 Species Song with full Mega and Echo performances. The other74 Species Songs retain Casey’s upstream performances. All play without time drift; the regular artwork stays the same. Harpy and Pegasus use their official shared-song swap.';
+  // Keep the previous roll model private while its replacement is pending or
+  // unavailable; setMidi restores all note metadata when composition succeeds.
+  const panel=$('midi-panel');panel.dataset.pending=String(!state.current);
+  panel.setAttribute('aria-busy',String(!state.current&&state.composing));
+  if(!state.current) {
+    panel.querySelector('h2').textContent=`${selectedTitle()} · ${title()} · MIDI`;
+    panel.querySelector('.midi-caption').textContent=state.composing ? 'Composing Name Song…' : 'Name Song unavailable. Tap Play to retry.';
+  }
   $('name-controls').hidden=state.kind!=='name';
   $('name-prefix').value=Math.floor((state.nameVariant-1)/18)+1;
   $('name-suffix').value=(state.nameVariant-1)%18+1;
@@ -113,7 +134,7 @@ function failed(error, request) {
   if (request !== state.serial) return;
   state.status = 'stopped'; state.synth?.stopMIDI(); timing.reset(); render();
   state.playbackStart = null; roll.setTick(0, false);
-  status(`Tap Play to start audio: ${error.message || error}`);
+  status(state.kind==='name'&&!state.current ? `Name Song unavailable: ${error.message || error}. Tap Play to retry.` : `Tap Play to start audio: ${error.message || error}`);
 }
 function select(sid, fx, play = true, kind = state.kind, nameVariant=state.nameVariant) {
   if(!state.data)return;
@@ -131,8 +152,8 @@ function select(sid, fx, play = true, kind = state.kind, nameVariant=state.nameV
     render();return sample;
   }
   if(kind==='name') {
-    clearArt();roll.setTick(0,false);$('midi-panel').setAttribute('aria-busy','true');$('midi-panel').querySelector('.midi-caption').textContent='Composing Name Song…';status('Composing…');render();
-    state.ready=state.names.compose(sid,fx,nameVariant).then(result=>{
+    mountArt();roll.setTick(0,false);status('Composing…');render();
+    state.ready=ensureNames().then(()=>{if(selection===state.selection)render();return state.names.compose(sid,fx,nameVariant)}).then(result=>{
       const midi=result.midi,model=parseMidi(midi);
       let tempoUs=500000;
       for(let i=0;i<midi.length-5;i++)if(midi[i]===255&&midi[i+1]===81&&midi[i+2]===3){tempoUs=midi[i+3]*65536+midi[i+4]*256+midi[i+5];break}
@@ -181,9 +202,6 @@ try {
   if (hash !== manifest.data.sha256) throw new Error('Sample file failed its content check');
   const data = await new Response(new Blob([packed]).stream().pipeThrough(new DecompressionStream('gzip'))).json();
   if (data.samples.length !== 600 || data.species.length !== 75 || new Set(data.samples.map(s=>`${s.kind}-${s.sid}-${s.fx}`)).size!==600) throw new Error('Incomplete sample set');
-  const namesResponse=await fetch('names/manifest.json');if(!namesResponse.ok)throw new Error('Could not load Name Song manifest');
-  state.namesManifest=await namesResponse.json();state.names=new NameSongs(state.namesManifest);
-  for(const [id,values] of [['name-prefix',state.namesManifest.prefixes],['name-suffix',state.namesManifest.suffixes]])values.forEach((value,i)=>{const option=document.createElement('option');option.value=i+1;option.textContent=value;$(id).append(option)});
   state.data = data; state.manifest = manifest; state.lookup = new Map(data.samples.map(s=>[`${s.kind}-${s.sid}-${s.fx}`,s]));
   for (const species of data.species) {
     const row = document.createElement('div'); row.className = 'species-row'; row.dataset.sid = species.id; row.dataset.name = [species.name, ...species.aliases].join(' ').toLowerCase();
@@ -193,7 +211,7 @@ try {
     labels().forEach((label, fx) => { const b = document.createElement('button'); b.textContent = String(fx); b.dataset.sid = species.id; b.dataset.fx = fx; b.setAttribute('aria-label', `${species.name}, preset ${fx}, ${label}`); row.append(b); });
     $('rows').append(row);
   }
-  document.querySelectorAll('button,select').forEach(button => { button.disabled = false; });
+  document.querySelectorAll('button').forEach(button => { button.disabled = false; });
   document.addEventListener('click', event => {
     const button = event.target.closest('button[data-fx]');
     if (button) select(+(button.dataset.sid || state.sid), +button.dataset.fx);
