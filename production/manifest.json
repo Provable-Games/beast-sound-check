@@ -8,9 +8,9 @@
   },
   "revision": "4a16c58bf1738bcd3636f1e475a310b24ecbddc5",
   "adapterHash": "66aa377a6ada6bc0305ee24db4d489048a79a8dcb2481fb339a7d9d89b6ae772",
-  "worker": "production/composer-bcc1d2c1ca7c0eca.js",
-  "data": "production/data-900b0ff3a8a31b4a.json.gz",
-  "identity": "1a1fd936e75bfb73baaa",
+  "worker": "production/composer-99bb19246ed66c33.js",
+  "data": "production/data-fb7407e72c102f7b.json.gz",
+  "identity": "15e3579a9b8a6a20f5bf",
   "species": [
     {
       "id": 1,
@@ -552,5 +552,5 @@
     "result": "identical MIDI bytes and Cairo settings hashes"
   },
   "workerBytes": 157855,
-  "dataBytes": 220008
+  "dataBytes": 170893
 }

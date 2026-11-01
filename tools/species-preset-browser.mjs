@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {speciesCardArt} from './species-card-art.mjs';
 import {createRequire} from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,7 +17,16 @@ const hash=x=>createHash('sha256').update(x).digest('hex');
 // Retiming/stilling changes only the embedded GIF/PNG, preserving card identity.
 const cardIdentity=src=>Buffer.from(src.slice(src.indexOf(',')+1),'base64').toString('latin1').replace(/data:image\/(?:gif|png);base64,[A-Za-z0-9+/=]+/,'RASTER');
 assert.equal(data.samples.length,600);
-assert.deepEqual(data.art,oldData.art);assert.deepEqual(data.species,oldData.species);
+assert.deepEqual(data.art,speciesCardArt(data.species));
+if(manifest.artPreservationProof){
+const artProof=JSON.parse(fs.readFileSync(path.join(dir,manifest.artPreservationProof)));
+assert.equal(artProof.currentData.sha256,manifest.data.sha256);
+const priorRaw=fs.readFileSync(path.join(dir,artProof.previousData.file));
+assert.equal(hash(priorRaw),artProof.previousData.sha256);
+const prior=JSON.parse(gunzipSync(priorRaw));
+for(const key of ['samples','settings','species']){assert.deepEqual(data[key],prior[key]);assert.equal(hash(JSON.stringify(data[key])),artProof.unchanged[key]);}
+}
+assert.deepEqual(data.species,oldData.species);
 const satoriProof=JSON.parse(fs.readFileSync(path.join(dir,'satori-song-cairo-proof.json')));
 for(const s of data.samples.filter(s=>s.kind==='song')){
  if(s.sid===44){const c=satoriProof.captures.find(x=>x.fx===s.fx);assert.equal(s.midiSha256,c.midiSha256);assert.equal(s.settingsHash,c.settingsHash);assert.equal(s.key,'A Aeolian');continue;}

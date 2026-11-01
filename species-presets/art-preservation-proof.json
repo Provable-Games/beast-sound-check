@@ -1,0 +1,40 @@
+{
+  "scope": "Display art only; all 600 samples, settings and species are byte-for-byte unchanged after JSON serialization. Prior payload and Cairo proofs remain immutable.",
+  "previousData": {
+    "file": "samples-1db4e55bb50e7c36.json.gz",
+    "sha256": "1db4e55bb50e7c360dc148ad6b1f6ba77dddf6a1e676f9ee51cccfcc74c31504",
+    "bytes": 1143706,
+    "samples": 600,
+    "species": 75,
+    "presets": [
+      0,
+      1,
+      2,
+      3
+    ]
+  },
+  "currentData": {
+    "file": "samples-c8f4b79a2e442349.json.gz",
+    "sha256": "c8f4b79a2e44234900b615473aed602710e8b2b7b5e74389376289d88d0a00c1",
+    "bytes": 415627,
+    "samples": 600,
+    "species": 75,
+    "presets": [
+      0,
+      1,
+      2,
+      3
+    ]
+  },
+  "unchanged": {
+    "samples": "d1ddc984bc5a83eca6fa990231cdcb8e78ec10cabaed49c2032e7d06392fd7f9",
+    "settings": "816f9f4ff79b1a7a2a587372b190439d1ad50593dcfa122ab10f155c988805f4",
+    "species": "6fbac50dc4c3651087be6f85b9ba2892970eb34c6343010e07db35e7aa564de5"
+  },
+  "generators": {
+    "tools/art.mjs": "fbae50ac87f58f1dbf0313c527c0a7f14ec37e173b94b1ef459c94141549cdc3",
+    "tools/card-header.mjs": "32392846fdb608c18402b1c4013c44d37da241406aa290b9f7925eca0eb5c3c5",
+    "tools/card-stats.mjs": "3e9c44e965ae3a5082c807fb38f4ab3a3625b68cccdb5774ce030a5d059d64be",
+    "tools/species-card-art.mjs": "2a08d002fe3a57cd28e161b5c0b482c56b5b8a2a0248a1ba54cb43bc0371578c"
+  }
+}
