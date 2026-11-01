@@ -1,0 +1,41 @@
+{
+  "repository": "https://github.com/Provable-Games/onchain-midi-player",
+  "revision": "38e21a1d67b4e39103341ad8f6f961ac36d5ef7a",
+  "license": "Apache-2.0",
+  "files": [
+    {
+      "source": "examples/beast_consumer/art_sync.js",
+      "file": "species-presets/art-sync.mjs",
+      "bytes": 33862,
+      "sha256": "b4dfd6c1630f6e1731f0bda73b461106603bc582c0dd9b00fbf7230e9f2128b7",
+      "modified": false
+    },
+    {
+      "source": "LICENSE",
+      "file": "species-presets/onchain-midi-player-LICENSE.txt",
+      "bytes": 11357,
+      "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
+      "modified": false
+    },
+    {
+      "source": "NOTICE",
+      "file": "species-presets/onchain-midi-player-NOTICE.txt",
+      "bytes": 1136,
+      "sha256": "4333bebb7458eb57965f9c9b108f060c8db8d8968bc87869d1585ef9b343eae4",
+      "modified": false
+    },
+    {
+      "source": "examples/beast_consumer/scripts/gif_decode.mjs",
+      "file": "tools/deps/gif-decode.mjs",
+      "bytes": 3997,
+      "sha256": "e570d789b5d0d67468497e9f5575b1d981127688a3474fbdcb1db35366fb6bd9",
+      "modified": false
+    }
+  ],
+  "adaptation": {
+    "file": "species-presets/music-clock.mjs",
+    "source": "player/player.js",
+    "sourceSha256": "b45fa8c27a62386554bb6545ec729119e7d341b79761b7510a9897461fc591ff",
+    "details": "Extracted audible-position snapshots, latency estimation/refresh and pass boundaries. The lab still owns its existing transport, selection cancellation and persistent synth; state changes come from that transport and AudioContext statechange. No audio scheduling is changed. Original production constants: 50ms boundary poll, 250ms latency refresh, 2ms latency change threshold, 50ms late-pass cutoff. Both art and piano roll read this clock."
+  }
+}

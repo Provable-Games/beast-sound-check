@@ -1,0 +1,117 @@
+{
+  "browser": "Chromium",
+  "url": "http://127.0.0.1:8791",
+  "dataSha256": "1db4e55bb50e7c360dc148ad6b1f6ba77dddf6a1e676f9ee51cccfcc74c31504",
+  "samples": 600,
+  "modes": [
+    "song",
+    "check"
+  ],
+  "checks": [
+    "all600 UI selections resolve exact MIDI/settings;75rows/300buttons per mode;one Cyclops row;one context and latest request wins",
+    "both modes and all Song presets produce non-silent audio; Cyclops complete504 and another portato Check play through the persistent synth",
+    "mode switches preserve species/preset/fixed art and use accurate Song echo vs Check portato labels",
+    "Stop clears old notes; pause/resume reuses the same context without overlap",
+    "search/aliases/keyboard remain available; legacy#64-0 is Song and#check-64-3 is the included Cyclops candidate",
+    "390px mobile layout fits both modes; art decoded and visible before screenshots",
+    "zero browser errors and zero external network requests"
+  ],
+  "peaks": [
+    {
+      "kind": "check",
+      "sid": 1,
+      "fx": 0,
+      "peak": 0.06643511354923248
+    },
+    {
+      "kind": "song",
+      "sid": 1,
+      "fx": 0,
+      "peak": 0.3910827338695526
+    },
+    {
+      "kind": "song",
+      "sid": 1,
+      "fx": 1,
+      "peak": 0.31224483251571655
+    },
+    {
+      "kind": "song",
+      "sid": 1,
+      "fx": 2,
+      "peak": 0.2034814953804016
+    },
+    {
+      "kind": "song",
+      "sid": 1,
+      "fx": 3,
+      "peak": 0.37087512016296387
+    },
+    {
+      "kind": "song",
+      "sid": 44,
+      "fx": 0,
+      "peak": 0.27072036266326904
+    },
+    {
+      "kind": "song",
+      "sid": 44,
+      "fx": 1,
+      "peak": 0.23788636922836304
+    },
+    {
+      "kind": "song",
+      "sid": 44,
+      "fx": 2,
+      "peak": 0.21457047760486603
+    },
+    {
+      "kind": "song",
+      "sid": 44,
+      "fx": 3,
+      "peak": 0.21457047760486603
+    },
+    {
+      "kind": "check",
+      "sid": 64,
+      "fx": 0,
+      "peak": 0.05262811854481697
+    },
+    {
+      "kind": "check",
+      "sid": 64,
+      "fx": 1,
+      "peak": 0.05262811854481697
+    },
+    {
+      "kind": "check",
+      "sid": 64,
+      "fx": 2,
+      "peak": 0.052533574402332306
+    },
+    {
+      "kind": "check",
+      "sid": 64,
+      "fx": 3,
+      "peak": 0.06138543412089348
+    },
+    {
+      "kind": "check",
+      "sid": 2,
+      "fx": 2,
+      "peak": 0.06076207756996155
+    },
+    {
+      "kind": "check",
+      "sid": 44,
+      "fx": 1,
+      "peak": 0.046445395797491074
+    }
+  ],
+  "screenshots": [
+    "/tmp/beast-song-check-desktop.png",
+    "/tmp/beast-song-check-mobile.png"
+  ],
+  "javascriptErrors": [],
+  "externalRequests": []
+}

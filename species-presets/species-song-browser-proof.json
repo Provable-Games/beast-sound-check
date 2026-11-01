@@ -1,0 +1,66 @@
+{
+  "browser": "Chromium",
+  "url": "http://127.0.0.1:8791",
+  "checks": [
+    "75 species, 300 preset buttons, no external player or horizontal overflow",
+    "nine parent-button selections produce non-silent audio, all four presets, one AudioContext",
+    "fixed regular art, rapid switching settles latest selection; Stop clears every old note",
+    "pause/resume retains the primed context",
+    "name/alias search, species stepping preserves preset, keyboard preset changes preserve species",
+    "390px mobile layout and preset control; screenshots wait for decoded art and enabled controls",
+    "zero browser JavaScript errors and zero external network requests"
+  ],
+  "peaks": [
+    {
+      "sid": 1,
+      "fx": 0,
+      "peak": 0.3910827338695526
+    },
+    {
+      "sid": 1,
+      "fx": 1,
+      "peak": 0.3910827338695526
+    },
+    {
+      "sid": 1,
+      "fx": 2,
+      "peak": 0.13628028333187103
+    },
+    {
+      "sid": 1,
+      "fx": 3,
+      "peak": 0.37087512016296387
+    },
+    {
+      "sid": 44,
+      "fx": 0,
+      "peak": 0.37087512016296387
+    },
+    {
+      "sid": 44,
+      "fx": 3,
+      "peak": 0.25366711616516113
+    },
+    {
+      "sid": 68,
+      "fx": 3,
+      "peak": 0.37604355812072754
+    },
+    {
+      "sid": 39,
+      "fx": 2,
+      "peak": 0.37604355812072754
+    },
+    {
+      "sid": 40,
+      "fx": 1,
+      "peak": 0.3626110553741455
+    }
+  ],
+  "screenshots": [
+    "/tmp/beast-species-presets-desktop.png",
+    "/tmp/beast-species-presets-mobile.png"
+  ],
+  "javascriptErrors": [],
+  "externalRequests": []
+}
