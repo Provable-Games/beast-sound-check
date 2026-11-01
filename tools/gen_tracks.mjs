@@ -6,12 +6,12 @@
 //   OMP=<onchain-midi-player checkout> BEAST=<midi_fun_contract checkout> BEASTS3=<beasts-v3 checkout> node gen_tracks.mjs
 //
 // OMP     an onchain-midi-player checkout at the player under test (0.7.0+), with `npm ci` run in it.
-// BEAST   a midi_fun_contract checkout (main); offchain/beast-sound needs `npm install` (@scure/starknet).
+// BEAST   the midi_fun_contract release pinned by Beasts; offchain/beast-sound needs `npm install` (@scure/starknet).
 //         Run installs in worktrees, never in someone's working checkout.
 // BEASTS3 a beasts-v3 checkout for the card template and genesis GIFs (art.mjs).
 // OMP_LABEL / BEAST_LABEL name those commits in the page's footer.
-// BEAST_SONGS (optional) a midi_fun_contract checkout of Casey's branch whose Species Songs section 6 plays (the branch beast-editions at
-//         the time of writing), with `npm install` in offchain/beast-sound; BEAST_SONGS_LABEL names the branch and commit. Without it
+// BEAST_SONGS (optional) the same pinned midi_fun_contract release for the Species Songs section,
+//         with `npm install` in offchain/beast-sound; BEAST_SONGS_LABEL names the release and commit. Without it
 //         there is no section 6.
 //
 // Every page is the complete NFT-owned document of onchain-midi-player's reference Beast consumer
@@ -21,6 +21,7 @@
 // and decodeTokenUri, and the token_uri passes scripts/validate_token_uri.mjs, so the bytes are what a
 // 0.7.0 Beast's animation_url would carry.
 import fs from "node:fs";
+import { assertCanonicalMusic } from "./production-source.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -29,6 +30,7 @@ const need = (k) => process.env[k] || (console.error(`set ${k} (see the header)`
 const OMP = need("OMP");
 const BEAST = need("BEAST");
 const BS = BEAST + "/offchain/beast-sound";
+const music = assertCanonicalMusic(BEAST);
 const imp = (p) => import(p);
 
 const SEG = await imp(OMP + "/scripts/segments.mjs");
@@ -39,8 +41,9 @@ const SF = await imp(OMP + "/scripts/settings_fixtures.mjs");
 const RW = await imp(OMP + "/scripts/reference_waves.mjs");
 const SS = await imp(BS + "/onchain/tinychip/synth_settings.mjs");
 const ES = await imp(BS + "/onchain/tinychip/essentials.mjs");
-// Casey's branch for section 6 (its own copy of beast-sound: engine, lab, settings generator)
+// The pinned production source for section 6 (engine, lab, settings generator)
 const BEAST_SONGS = process.env.BEAST_SONGS || "";
+const songsMusic = BEAST_SONGS ? assertCanonicalMusic(BEAST_SONGS) : null;
 const SONGS = BEAST_SONGS && {
   label: need("BEAST_SONGS_LABEL"),
   idx: await imp(BEAST_SONGS + "/offchain/beast-sound/src/index.js"), v11: await imp(BEAST_SONGS + "/offchain/beast-sound/src/engine_v11.js"),
@@ -902,7 +905,7 @@ for (const [cat, ids] of Object.entries(cats)) {
 }
 
 // =============================================================================================
-// 6. Original species songs (Casey's branch, BEAST_SONGS): the Species Song of each of the 75 original species, as
+// 6. Original species songs (pinned release, BEAST_SONGS): the Species Song of each of the 75 original species, as
 // the Originals Sound Manager publishes it. The manager stores, for each species, the Genesis Track of genesis_swap(id)
 // as ComposerInputs::Song(get_generation_inputs({ composition_seed: 0 }, 0, { species_id: genesis_swap(id), name 0, ... })
 // .base_song) and plays compose(inputs, sound_effects) with the token's sound effects. Here: sound effects 0 (as
@@ -951,7 +954,7 @@ for (const [id, pick] of Object.entries(BEAST_OVERRIDE)) {
 for (const sp of specs) build(sp);
 const meta = {
   generated: new Date().toISOString(), playerVersion: SEG.VERSION, fixedBytes: Object.values(FIXED).reduce((n, f) => n + f.length, 0),
-  beastCommit: need("BEAST_LABEL"), ompCommit: need("OMP_LABEL"), songsCommit: SONGS ? SONGS.label : "",
+  music, songsMusic, beastCommit: need("BEAST_LABEL"), ompCommit: need("OMP_LABEL"), songsCommit: SONGS ? SONGS.label : "",
   bankFail, warn,
   usedArt, playAnchor,
 };

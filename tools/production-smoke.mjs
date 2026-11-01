@@ -5,6 +5,7 @@ import path from 'node:path';
 import http from 'node:http';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { cardHeader, previewRank, withCardHeader } from './card-header.mjs';
 import { productionSource } from './production-source.mjs';
 
 const root = path.resolve(new URL('..', import.meta.url).pathname);
@@ -34,6 +35,8 @@ const ready = async (text) => {
 const frame = () => page.frames().find(f => f !== page.mainFrame());
 const source = await productionSource();
 const built = JSON.parse(fs.readFileSync(path.join(root, 'index.html'), 'utf8').match(/<script[^>]+id="data"[^>]*>([\s\S]*?)<\/script>/)[1]);
+const shots = process.env.SHOTS || '/tmp/beast-sound-lab-evidence';
+fs.mkdirSync(shots, { recursive: true });
 const rendition = JSON.parse(fs.readFileSync(path.join(root, 'renditions', built.sepolia.sets[0].dir, 'manifest.json'), 'utf8'));
 async function notesVisible() {
   await page.locator('#pw').scrollIntoViewIfNeeded();
@@ -65,6 +68,27 @@ async function matches() {
   const input = await page.evaluate(() => JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k => k.startsWith('beast-sound-check-')))).sample);
   const expected = Buffer.from(source.composer.compose(input).midi).toString('base64');
   assert.equal(await frame().locator('#onchain-midi-data').textContent(), expected);
+  const originalPage = await page.locator('#pw iframe').getAttribute('srcdoc');
+  const svg = Buffer.from(/<img id="beast-art"[^>]*src="data:image\/svg\+xml;base64,([^"]+)/.exec(originalPage)[1], 'base64').toString('utf8');
+  const fields = { name: source.TABLES.species[input.sid - 1], rank: previewRank(input.sid),
+    prefix: input.name ? source.TABLES.prefixes[Math.floor((input.name - 1) / 18)] : '',
+    suffix: input.name ? source.TABLES.suffixes[(input.name - 1) % 18] : '' };
+  assert.ok(svg.includes(cardHeader(fields)), 'Worker must draw the production name/rank header');
+  assert.equal(withCardHeader(svg, fields), svg);
+  assert.equal((svg.match(/>RANK<\/text>/g) || []).length, 1);
+  // Notes mode serializes the displayed SVG into a percent-encoded URI. Check the
+  // visible header as parsed XML, alongside the worker's exact original bytes.
+  const rendered = await frame().evaluate(expected => {
+    const src = document.getElementById('beast-art').src, comma = src.indexOf(',');
+    const displayed = /;base64/i.test(src.slice(0, comma)) ? atob(src.slice(comma + 1)) : decodeURIComponent(src.slice(comma + 1));
+    const texts = text => [...new DOMParser().parseFromString(text, 'image/svg+xml').querySelectorAll('text')]
+      .filter(e => e.getAttribute('x') === '125.5' || e.textContent === 'RANK' || (e.getAttribute('y') === '46' && e.getAttribute('text-anchor') === 'end'))
+      .map(e => ({ text: e.textContent, attributes: ['x', 'y', 'text-anchor', 'class', 'style'].map(a => [a, e.getAttribute(a)]) }));
+    return { actual: texts(displayed), expected: texts('<svg xmlns="http://www.w3.org/2000/svg">' + expected + '</svg>') };
+  }, cardHeader(fields));
+  assert.deepEqual(rendered.actual, rendered.expected);
+
+  if (!input.name) assert.doesNotMatch(svg, /<text[^>]*>"\s*"<\/text>/);
   return input;
 }
 try {
@@ -77,14 +101,38 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   await matches();
   await notesVisible();
-  console.log('PASS default sampler, all species/styles/names, one player, phone layout');
+  await page.locator('#pw').screenshot({ path: path.join(shots, 'sampler-unnamed-' + browserName + '.png') });
+  await page.click('#sample-play'); await ready(); await matches();
+  await page.click('#next'); await ready(/Typhon/); await matches();
+  await page.click('#prev'); await ready(/Warlock/); await matches();
+  const defaultUrl = page.url();
+  await page.reload(); await ready(/Warlock/); await matches();
+  const sharedPage = await context.newPage();
+  await sharedPage.goto(defaultUrl);
+  await sharedPage.waitForFunction(() => !document.getElementById('bp').disabled && document.getElementById('sample-now').textContent.startsWith('Now sampling:'), null, { timeout: 60000 });
+  const sharedSvg = await sharedPage.frames()[1].locator('#beast-art').getAttribute('src');
+  assert.equal(sharedSvg, await frame().locator('#beast-art').getAttribute('src'));
+  await sharedPage.close();
+  console.log('PASS unnamed header, mock rank stable through reload/navigation/shared URL, one player and phone layout');
 
   for (const kind of ['check', 'name', 'purchase', 'edition']) {
     await page.selectOption('#sample-kind', kind); await ready();
     if (kind !== 'check') { await page.selectOption('#sample-prefix', '69'); await ready(); await page.selectOption('#sample-suffix', '18'); await ready(); }
     for (const fx of ['0', '1', '2', '3']) { await page.selectOption('#sample-fx', fx); await ready(); await matches(); await notesVisible(); }
   }
-  console.log('PASS all official track types and sound effects match the production adapter');
+  const longestSpecies = source.TABLES.species.reduce((best, name, i) => name.length > source.TABLES.species[best - 1].length ? i + 1 : best, 1);
+  const longestPrefix = source.TABLES.prefixes.reduce((best, name, i) => name.length > source.TABLES.prefixes[best - 1].length ? i + 1 : best, 1);
+  const longestSuffix = source.TABLES.suffixes.reduce((best, name, i) => name.length > source.TABLES.suffixes[best - 1].length ? i + 1 : best, 1);
+  await page.selectOption('#sample-species', String(longestSpecies)); await ready();
+  await page.selectOption('#sample-prefix', String(longestPrefix)); await ready();
+  await page.selectOption('#sample-suffix', String(longestSuffix)); await ready(); await matches();
+  await page.locator('#pw').screenshot({ path: path.join(shots, 'sampler-long-name-' + browserName + '.png') });
+  for (const edge of ['min', 'max']) {
+    const sid = source.TABLES.species.reduce((best, _, i) => (edge === 'min' ? previewRank(i + 1) < previewRank(best) : previewRank(i + 1) > previewRank(best)) ? i + 1 : best, 1);
+    await page.selectOption('#sample-species', String(sid)); await ready(); await matches();
+    await page.locator('#pw').screenshot({ path: path.join(shots, 'sampler-rank-' + edge + '-' + browserName + '.png') });
+  }
+  console.log('PASS all official track types/effects and fitted named/rank headers match the production adapter');
 
   await page.selectOption('#sample-species', '68'); await ready(/Yeti/);
   await page.locator('#sample-seed').fill('0xffffffffffffffff'); await page.locator('#sample-seed').dispatchEvent('change'); await ready();
@@ -104,7 +152,7 @@ try {
   const playingNotes = await notesPixels();
   await page.waitForTimeout(350);
   assert.notEqual(await notesPixels(), playingNotes);
-  await page.locator('#pw').screenshot({ path: '/tmp/beast-sound-midi-preview-' + browserName + '.png' });
+  await page.locator('#pw').screenshot({ path: path.join(shots, 'sampler-midi-' + browserName + '.png') });
   await frame().locator('#play').click();
   await frame().waitForFunction(() => window.OnchainMidiPlayer.getPlayStatus().state === 'paused');
   await page.waitForTimeout(100);
@@ -141,7 +189,7 @@ try {
   assert.equal(await page.locator('#bp').isDisabled(), false);
   await page.selectOption('#sample-kind', 'species'); await ready();
   assert.equal(await page.locator('iframe').count(), 1);
-  await page.screenshot({ path: '/tmp/beast-sound-sampler-' + browserName + '.png', fullPage: false });
+  await page.screenshot({ path: path.join(shots, 'sampler-' + browserName + '.png'), fullPage: false });
   assert.deepEqual(errors, []); assert.deepEqual(external, []);
   console.log('PASS deployed references remain available, returning to the sampler, no page errors or external services');
 } catch (error) {

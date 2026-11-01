@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Stage 2: tracks.json -> index.html (one file with no dependencies).
-//   BEASTS3=<beasts-v3 checkout> OMP_MAIN=<onchain-midi-player checkout> node build_site.mjs
+//   BEAST=<pinned MIDI checkout> BEASTS3=<beasts-v3 checkout> OMP_MAIN=<onchain-midi-player checkout> node build_site.mjs
 // (run gen_tracks.mjs first; see its header for the repo checkouts)
 //
 // The engine tests (tracks.json) are embedded. The real Beasts (section 1, "Beasts on Sepolia") are not: the page
@@ -26,6 +26,7 @@
 // at its manifest's source revision is accepted only when the manifest declares the difference (`localAdaptation`).
 import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
+import { assertCanonicalMusic } from "./production-source.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +34,8 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const data = JSON.parse(fs.readFileSync(path.join(here, "tracks.json"), "utf8"));
 data.production = JSON.parse(fs.readFileSync(path.join(here, "../production/manifest.json"), "utf8"));
+const music = assertCanonicalMusic(process.env.BEAST || "/workspace/midi_fun_contract");
+if (data.production.revision !== music.revision || data.meta.music?.revision !== music.revision || (data.meta.songsCommit && data.meta.songsMusic?.revision !== music.revision)) throw new Error('Rebuild both the sampler and section 6 from the current Beasts music pin');
 // OUT may be old/index.html; keep the shared worker reachable from either page.
 data.production.worker = path.relative(path.dirname(path.resolve(process.env.OUT || path.join(here, "../index.html"))), path.join(here, "..", data.production.worker)).split(path.sep).join("/");
 const SAMPLER = fs.readFileSync(path.join(here, "production-sampler.js"), "utf8");
@@ -328,7 +331,7 @@ ${BANNER}
 <section class="card" id="sampler" aria-labelledby="sample-hd">
   <div class="kicker">Proposed production sound</div>
   <h2 id="sample-hd">Sample all 75 Beasts</h2>
-  <p class="muted">Choose a track and effects preset, then step through the species with the same settings. MIDI notes follow the Sepolia visual preset: off for 0 and 1, on for 2 and 3. Change a name, style or seed to explore variations.</p>
+  <p class="muted">Choose a track and effects preset, then step through the species with the same settings. MIDI notes follow the Sepolia visual preset: off for 0 and 1, on for 2 and 3. Change a name, style or seed to explore variations. Card ranks are illustrative and fixed per species; Genesis Beasts on chain are unranked.</p>
   <div class="samplegrid">
     <label class="field"><span>Species</span><select id="sample-species"></select></label>
     <label class="field"><span>Track</span><select id="sample-kind"><option value="species">Species Song</option><option value="check">Sound Check</option><option value="name">Name Song</option><option value="purchase">Custom canon (edition 0)</option><option value="edition">Edition track</option></select></label>
