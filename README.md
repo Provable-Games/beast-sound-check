@@ -51,6 +51,8 @@ The comparison requires exactly all 1,635 distinct cases, byte-identical MIDI an
 
 Run `node tools/production-smoke.mjs` with `PLAYWRIGHT_CORE` pointing to an installed Playwright package; `PLAYWRIGHT_BROWSER=webkit` runs the same checks in WebKit. This verifies browser worker output, all styles/effects, actual playback, stable comparisons, large seeds, shared links, ratings, stale requests, production-equivalent headers, stable mock ranks and deployed-reference switching. `SHOTS=<dir>` saves the unnamed, longest named and rank-extreme cards. The pre-existing `tools/smoke.mjs` covers the deployed pages and engine controls.
 
+Run `node tools/lab-music-consistency.mjs` to compare the shipped homepage worker's 600 Species Song/Sound Check selections and all 75 embedded Species Songs with `/species-presets/`. It also verifies the reported Satori URL and `#644` play exact #411. When `species-presets/names/parity.json` is available, it checks the captured Name Songs too; `NAME_PROOF` can select that proof from a separate worktree.
+
 ### Check card headers against Cairo
 
 The shared `tools/card-header.mjs` mirrors the current renderer's header formulas. This offline check renders 240 cases through the actual Cairo renderer: rank 0–4, every last digit and digit-count transitions through u16 max, long names/affixes, prefix/suffix-only names, and regular/shiny chrome. It compares the exact header bytes with the shared helper and both art templates.
@@ -170,8 +172,8 @@ The engine is [pocket-synth](https://github.com/Provable-Games/pocket-synth). on
    PLAYER=$(sed -n 's/^export const VERSION = "\([^"]*\)".*/\1/p' $OMP/scripts/segments.mjs)
    ENGINE=$(sed -n 's/^export const ENGINE_PIN = { ref: "\([^"]*\)".*/\1/p' $OMP/scripts/engine.mjs)
    export OMP_LABEL="origin/main $(git -C $OMP rev-parse --short HEAD) (player $PLAYER, pocket-synth $ENGINE)"
-   MIDI_TAG=$(node -p 'require(process.argv[1]).source_tag' "$BEASTS3/fixtures/sound-manager/manifest.json")
-   export BEAST_LABEL="$MIDI_TAG $(git -C "$BEAST" rev-parse --short HEAD)"
+   MIDI_LABEL=$(node -p 'require(process.argv[1]).label' ./tools/current-music.json)
+   export BEAST_LABEL="$MIDI_LABEL $(git -C "$BEAST" rev-parse --short HEAD)"
    export BEAST_SONGS_LABEL="$BEAST_LABEL"
    node tools/gen_tracks.mjs        # writes tools/tracks.json: expect 136 tracks (61 engine tests and 75 species songs) and "warn []"
    node tools/build_production.mjs # first refresh the Cairo parity record as described above
