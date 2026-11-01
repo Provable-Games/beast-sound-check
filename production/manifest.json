@@ -1,15 +1,16 @@
 {
   "schema": "beast-production-sampler/v1",
   "music": {
-    "repository": "https://github.com/caseywescott/midi_fun_contract",
-    "tag": "v1.0.1",
-    "revision": "8d1d96e664bd35d468e66830324ef25a42fd58bd"
+    "repository": "https://github.com/loothero/midi_fun_contract",
+    "revision": "4a16c58bf1738bcd3636f1e475a310b24ecbddc5",
+    "label": "Approved launch listening music",
+    "scope": "Current lab previews only; historical snapshots and deployed Sound Manager pins are independent."
   },
-  "revision": "8d1d96e664bd35d468e66830324ef25a42fd58bd",
-  "adapterHash": "3bed767f41b280550a685edd399afdc36b0622c0e90b4d6c18dada33cb6dd551",
-  "worker": "production/composer-89dbf0ebfc9febef.js",
-  "data": "production/data-ae3feb87164fc4ac.json.gz",
-  "identity": "b8a52b2f9eb4c8ec2620",
+  "revision": "4a16c58bf1738bcd3636f1e475a310b24ecbddc5",
+  "adapterHash": "66aa377a6ada6bc0305ee24db4d489048a79a8dcb2481fb339a7d9d89b6ae772",
+  "worker": "production/composer-bcc1d2c1ca7c0eca.js",
+  "data": "production/data-900b0ff3a8a31b4a.json.gz",
+  "identity": "1a1fd936e75bfb73baaa",
   "species": [
     {
       "id": 1,
@@ -221,7 +222,7 @@
     },
     {
       "id": 53,
-      "name": "Balrog"
+      "name": "Asag"
     },
     {
       "id": 54,
@@ -289,7 +290,7 @@
     },
     {
       "id": 70,
-      "name": "Ent"
+      "name": "Metsavana"
     },
     {
       "id": 71,
@@ -544,12 +545,12 @@
     }
   ],
   "parity": {
-    "revision": "8d1d96e664bd35d468e66830324ef25a42fd58bd",
-    "adapterHash": "3bed767f41b280550a685edd399afdc36b0622c0e90b4d6c18dada33cb6dd551",
-    "casesHash": "e9fa7b1f00916dc482639f841397b0c7e483e6badb496b7a9cbb6f8c3796c145",
-    "cases": 1611,
+    "revision": "4a16c58bf1738bcd3636f1e475a310b24ecbddc5",
+    "adapterHash": "66aa377a6ada6bc0305ee24db4d489048a79a8dcb2481fb339a7d9d89b6ae772",
+    "casesHash": "6731b600ff3aaa2ec0d9c2378a658a362cdc8e87b6c891cb7699261f245702e4",
+    "cases": 1635,
     "result": "identical MIDI bytes and Cairo settings hashes"
   },
-  "workerBytes": 129890,
-  "dataBytes": 219618
+  "workerBytes": 157855,
+  "dataBytes": 220008
 }

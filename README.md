@@ -4,7 +4,7 @@ The [launch listening lab](species-presets/README.md) has **Species Song** and *
 
 A phone-first listening test for the proposed production sound of all 75 original Beasts. The default **Sample all 75 Beasts** panel composes official Sound Checks, Species Songs, named songs and generated custom tracks on your device. Deployed Sepolia token pages and the synthetic engine tests remain available as references.
 
-The sampler and section 6 use midi_fun_contract `8d1d96e` (`v1.0.1`), the exact release pinned by the current Beasts V3 Sound Manager, with onchain-midi-player 0.12.0 / pocket-synth v2.1.2. Its adapter is checked against the actual Cairo composer: **1,611 cases have identical MIDI bytes and synth-settings hashes**. All 75 Species Songs also match this production composer. The music-relevant Cairo, JS and settings sources are identical between this release and upstream main `cdcad0a`; v1.0.1 includes the low-tonic voice-register fix after v1.0.0.
+The root sampler, section 6 and the current `/species-presets/` choices use the same approved lab music from midi_fun_contract `4a16c58`, with onchain-midi-player 0.12.0 / pocket-synth v2.1.2. The exact source is recorded in [`tools/current-music.json`](tools/current-music.json); this preview pin is independent of deployed Sound Manager pins. The root and listening-room builds share the qualified adapter in `tools/launch-check-reference/`, including Satori's authored #411 arrangement and its per-effect settings. The root adapter is checked against the actual Cairo composer across **1,635 cases**, with identical MIDI bytes and synth-settings hashes. All 75 embedded FX0 Species Songs use that same current-recipe path. Historical onchain/rendition snapshots retain their original source and bytes.
 Open https://provable-games.github.io/beast-sound-check/ on your phone.
 
 The engine tests run player 0.12.0 (engine: [pocket-synth](https://github.com/Provable-Games/pocket-synth) v2.1.2, with a k-rate detune on every oscillator). For an A/B on the same device, https://provable-games.github.io/beast-sound-check/old/ is the same build from onchain-midi-player `8b1ff66`, just before the re-pin (player 0.7.0, engine v2.0.1), so the two differ only in the engine. (`/old/` predates section 1: it still has Casey's compositions on the reference page in its place. It has no section 6.)
@@ -29,7 +29,7 @@ Pass/Fail and notes belong to the exact normalized sample and the content-addres
 
 ### Refresh the production sampler
 
-Use a clean `BEAST` checkout at `BEASTS3/fixtures/sound-manager/manifest.json`'s exact `source_revision` (currently `v1.0.1`, `8d1d96e`) with its `offchain/beast-sound` dependencies installed, plus `OMP` and `BEASTS3` as below. Run the following from this repository. The Cairo fixture runs in a temporary source copy, leaving the working checkout unchanged:
+Use a clean `BEAST` checkout at `tools/current-music.json`'s exact `revision` (`4a16c58`) with its `offchain/beast-sound` dependencies installed, plus `OMP` and `BEASTS3` as below. Run the following from this repository. The Cairo fixture runs in a temporary source copy, leaving the working checkout unchanged:
 
 ```sh
 # Generate and run the actual production composition paths.
@@ -47,7 +47,7 @@ node tools/build_site.mjs
 
 The sampler and track builds reject a `BEAST` or `BEAST_SONGS` revision that differs from that manifest, or music sources with local changes. `build_site.mjs` also requires `BEAST` and rejects stale sampler/section-6 metadata. These checks run only at build time.
 
-The comparison requires exactly all 1,611 distinct cases, byte-identical MIDI and matching Cairo settings hashes. It writes `production/parity.json`; `build_production.mjs` refuses to build a changed composer revision or adapter without a fresh successful comparison. Coverage includes every species and effects code for checks/songs/named/purchased tracks, all styles in all three families with every effects code, the Yeti, song swaps, name 1242, later editions, and zero/u64/felt boundary seeds. Regenerate the content-addressed worker/data, manifest, parity record and `index.html` together. The build retains upstream license texts in `production/NOTICE.txt`.
+The comparison requires exactly all 1,635 distinct cases, byte-identical MIDI and matching Cairo settings hashes. It writes `production/parity.json`; `build_production.mjs` refuses to build a changed composer revision or adapter without a fresh successful comparison. Coverage includes every species and effects code for checks/songs/named/purchased tracks, all styles in all three families with every effects code, the Yeti, song swaps, name 1242, later editions, and zero/u64/felt boundary seeds. Regenerate the content-addressed worker/data, manifest, parity record and `index.html` together. The build retains upstream license texts in `production/NOTICE.txt`.
 
 Run `node tools/production-smoke.mjs` with `PLAYWRIGHT_CORE` pointing to an installed Playwright package; `PLAYWRIGHT_BROWSER=webkit` runs the same checks in WebKit. This verifies browser worker output, all styles/effects, actual playback, stable comparisons, large seeds, shared links, ratings, stale requests, production-equivalent headers, stable mock ranks and deployed-reference switching. `SHOTS=<dir>` saves the unnamed, longest named and rank-extreme cards. The pre-existing `tools/smoke.mjs` covers the deployed pages and engine controls.
 
@@ -103,25 +103,25 @@ Its art is the Beasts V3 card template as the renderer draws it (beasts-v3's ren
 
 ## Section 6: Original species songs
 
-Section 6 (tracks 6.01 to 6.75, ids `601` to `675`, for example `#601`) has one track for each of the 75 original species: its **Species Song**, the track every Beast of that species plays by default (its Genesis Track), as the production composer in [midi_fun_contract](https://github.com/caseywescott/midi_fun_contract) composes it. The section's title names the pinned composer commit (`BEAST_SONGS`, the same source as `BEAST`). Section 1 plays the music of the `sepolia-2026-10-30-2` deployment, whose `BeastPureComposer` is built from midi_fun_contract `e9b0f66` (`v1.0.0`, `main` after the beast-editions merge, [PR #28](https://github.com/caseywescott/midi_fun_contract/pull/28)); section 6 uses the current Beasts-pinned `v1.0.1` (`8d1d96e`) composer. The recorded deployment keeps its original release and bytes. It remains the stable effects-0 baseline; use the sampler for other effects and track types.
+Section 6 (tracks 6.01 to 6.75, ids `601` to `675`, for example `#601`) has one track for each of the 75 original species: its **Species Song**, the track every Beast of that species plays by default (its Genesis Track), as the approved lab composer in [loothero/midi_fun_contract](https://github.com/loothero/midi_fun_contract/tree/4a16c58bf1738bcd3636f1e475a310b24ecbddc5) composes it. The section's title names the pinned composer commit (`BEAST_SONGS`, the same source as `BEAST`). Section 1 plays the music of the `sepolia-2026-10-30-2` deployment, whose `BeastPureComposer` is built from midi_fun_contract `e9b0f66` (`v1.0.0`, `main` after the beast-editions merge, [PR #28](https://github.com/caseywescott/midi_fun_contract/pull/28)); section 6 uses the approved lab source `4a16c58`, matching the current root sampler and listening room. The recorded deployment keeps its original release and bytes. It remains the stable effects-0 baseline; use the sampler for other effects and track types.
 
 - **What the song is.** The Originals Sound Manager stores, for each species, `ComposerInputs::Song(get_generation_inputs({ composition_seed: 0 }, 0, { species_id: genesis_swap(id), name_variant_id: 0, tier, family }).base_song)` (beasts-v3's `deploy/records/sound-sepolia-*.json`, `sharedTracks.derivation`) and plays `BeastPureComposer.compose(inputs, sound_effects)`, which returns the MIDI and the TinySynth settings. Harpy (39) and Pegasus (40) publish each other's song (`genesis_swap`); their titles say so.
 - **What a track plays.** The song as written (`sound_effects` 0: not mega, no chip echo, no drift) for the species' regular Beast: level 50, health 200, no special name, as the song composes it; its card has the species' regular genesis GIF as an isolated image, on the same reference Beast page as the engine tests (`consumerPieces`, `validate_token_uri`).
 - **What it leaves out.** Monthly Track Editions (a purchase in edition 1 or later of species 1 to 75 plays the edition's style engine on the species' theme: a bought track, not the original's default), Drift (the Live mode's day, week and month changes, `compose_drift`), sound effects 1 to 3 (mega and chip echo; the Sepolia Genesis Beasts in section 1 are mega), name tracks and bought songs.
-- **Where the notes and sounds come from.** The notes are lab.js's `genesisMidi(id, false)` in that checkout, which the branch holds byte-identical to its Cairo; the sounds are `synth_settings.mjs`'s settings for the song's family (the Yeti's for species 68), the settings the contract returns. `tools/species_songs_check.mjs` runs the branch's own Cairo for all 75 species (`get_generation_inputs`, then `compose_sound(.., 0)`, under snforge) and requires every MIDI to be byte-identical and every settings hash equal. At `e9b0f66` all 75 are, including the bytes embedded in the previous `5c40273` build. The current `v1.0.1` (`8d1d96e`) release also passes all 75 cases. Rerun the check when the pinned release changes (its header has the commands); the checker requires each species ID 1–75 exactly once.
+- **Where the notes and sounds come from.** The shared `createProductionComposer` adapter composes each species' current recipe with effects 0 and returns its actual settings. This includes authored Satori #411; legacy `lab.genesisMidi` alone does not select that recipe. `tools/species_songs_check.mjs` compares every species' MIDI and settings with actual Cairo output, either its dedicated captures or the Species Song rows in the full production matrix. The root worker and listening room must also agree on all 300 Species Song and 300 Sound Check outputs. Historical fixture captures retain their original provenance.
 - **Size.** 75 tracks with three art variants each would add about 7 MB. A track here has the original GIF page only (`lean` in `gen_tracks.mjs`; the art buttons, Card synced and the speed row are off for it), and the card's embedded font, the same 14.7 KB in every card and most of its bytes, is cut out and kept once (`cutFont`; `pageOf` puts it back by concatenation). That is +1.27 MB raw and +0.25 MB gzipped in `index.html`, for 75 tracks.
 
 ## Rebuild
 
-The page is built from three other repos, from clean Beasts/player worktrees at `main` and the exact MIDI release Beasts pins (the footer alternative can use the player checkout, and section 6 uses the same pinned MIDI source), plus the rendition sets in `renditions/` and the production sampler assets in `production/`:
+The page is built from three other repos, from clean Beasts/player worktrees at `main` and the approved MIDI revision in `tools/current-music.json` (the footer alternative can use the player checkout, and section 6 uses the same pinned MIDI source), plus the rendition sets in `renditions/` and the production sampler assets in `production/`:
 
 | Variable | Repo | What the build takes from it |
 | --- | --- | --- |
 | `OMP` | [onchain-midi-player](https://github.com/Provable-Games/onchain-midi-player) | The engine tests: player and engine segments, the reference Beast page (`examples/beast_consumer`), page assembly and `validate_token_uri` |
-| `BEAST` | [midi_fun_contract](https://github.com/caseywescott/midi_fun_contract) | The Beasts-pinned production composer and its TinyChip settings, bank and species names for the sampler and engine tests |
+| `BEAST` | [loothero/midi_fun_contract](https://github.com/loothero/midi_fun_contract) | The explicitly pinned approved lab composer and its TinyChip settings, bank and species names for the sampler and engine tests |
 | `BEASTS3` | [beasts-v3](https://github.com/Provable-Games/beasts-v3) (private) | The engine tests' card template and the 75 genesis GIFs; the deployed page footer (`assets/player-page/footer.html`, checked against its manifest and against onchain-midi-player's file at the manifest's source revision, unless the manifest declares a `localAdaptation`) |
 | `OMP_MAIN` | onchain-midi-player at `origin/main` | The "Upstream main" page footer (`examples/beast_consumer/fixtures/footer.html`) and its commit |
-| `BEAST_SONGS` (optional) | [midi_fun_contract](https://github.com/caseywescott/midi_fun_contract) at the same pinned production commit as `BEAST` | Section 6: the 75 Species Songs (`genesisMidi`) and their family settings. `BEAST_SONGS_LABEL` names the release and commit in the section title. Without `BEAST_SONGS` there is no section 6 |
+| `BEAST_SONGS` (optional) | [loothero/midi_fun_contract](https://github.com/loothero/midi_fun_contract) at the same approved lab commit as `BEAST` | Section 6: the 75 current Species Song recipes and their actual returned settings, through the shared adapter. `BEAST_SONGS_LABEL` names the release and commit in the section title. Without `BEAST_SONGS` there is no section 6 |
 
 `build_site.mjs` bakes in each footer's text, commit and SHA-256 and a summary of each set in `renditions/`; it does not embed the sets. `OMP` may be a different commit from `OMP_MAIN`: the engine tests follow `OMP`, the footer selector follows `OMP_MAIN`. Rebuild when it moves or a set is added. To offer an open PR's footer, add `{ key, env, label, title }` to `FOOTER_CHOICES` and a checkout of its branch in that variable.
 
@@ -137,7 +137,7 @@ The engine is [pocket-synth](https://github.com/Provable-Games/pocket-synth). on
 
 1. **pocket-synth to onchain-midi-player (only for a new engine release).** Compare `gh release view -R Provable-Games/pocket-synth` with `ENGINE_PIN` in onchain-midi-player's `scripts/engine.mjs`. If a newer signed release changes the engine, re-pin it in onchain-midi-player as "Re-pinning" in its `tests/vendor/README.md` describes: verify the tag and its reproducible build, run `vendor_engine.mjs`, choose a new `VERSION`, regenerate and run the full checks. Then merge that PR. Releases that only change CI or docs need nothing.
 
-2. **Make clean checkouts at current main and the pinned music release.** Use worktrees, not working checkouts that may have local changes:
+2. **Make clean checkouts at current main and the approved lab music revision.** Use worktrees, not working checkouts that may have local changes:
 
    ```sh
    git -C /workspace/onchain-midi-player fetch -q origin
@@ -147,9 +147,10 @@ The engine is [pocket-synth](https://github.com/Provable-Games/pocket-synth). on
    git -C /workspace/beasts-v3 fetch -q origin
    git -C /workspace/beasts-v3 worktree add --detach /workspace/beasts-v3-worktrees/sound-check origin/main
 
-   # Use the exact release Beasts pins, including for section 6.
-   MIDI_REV=$(node -p 'require(process.argv[1]).source_revision' /workspace/beasts-v3-worktrees/sound-check/fixtures/sound-manager/manifest.json)
-   git -C /workspace/midi_fun_contract fetch -q origin --tags
+   # Use the explicit approved lab source, including for section 6.
+   MIDI_REV=$(node -p 'require(process.argv[1]).revision' ./tools/current-music.json)
+   MIDI_REPO=$(node -p 'require(process.argv[1]).repository' ./tools/current-music.json)
+   git -C /workspace/midi_fun_contract fetch -q "$MIDI_REPO" "$MIDI_REV"
    git -C /workspace/midi_fun_contract worktree add --detach /workspace/midi_fun_contract-worktrees/sound-check "$MIDI_REV"
    (cd /workspace/midi_fun_contract-worktrees/sound-check/offchain/beast-sound && npm install)
 

@@ -35,7 +35,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const data = JSON.parse(fs.readFileSync(path.join(here, "tracks.json"), "utf8"));
 data.production = JSON.parse(fs.readFileSync(path.join(here, "../production/manifest.json"), "utf8"));
 const music = assertCanonicalMusic(process.env.BEAST || "/workspace/midi_fun_contract");
-if (data.production.revision !== music.revision || data.meta.music?.revision !== music.revision || (data.meta.songsCommit && data.meta.songsMusic?.revision !== music.revision)) throw new Error('Rebuild both the sampler and section 6 from the current Beasts music pin');
+if (data.production.revision !== music.revision || data.meta.music?.revision !== music.revision || (data.meta.songsCommit && data.meta.songsMusic?.revision !== music.revision)) throw new Error('Rebuild both the sampler and section 6 from the approved current lab music pin');
 // OUT may be old/index.html; keep the shared worker reachable from either page.
 data.production.worker = path.relative(path.dirname(path.resolve(process.env.OUT || path.join(here, "../index.html"))), path.join(here, "..", data.production.worker)).split(path.sep).join("/");
 const SAMPLER = fs.readFileSync(path.join(here, "production-sampler.js"), "utf8");
@@ -693,7 +693,7 @@ var listEl = $("list"), rows = {}, secCount = {}, realSec = { d: el("details"), 
     if (!sec || sec.id !== t.sectionId) {
       if (t.sectionId === "6") {
         listEl.appendChild(el("h3", "enghd", "Original species songs"));
-        listEl.appendChild(el("p", "muted", "One track for each of the 75 original species: the Species Song every Beast of that species plays by default (its Genesis Track), from the production midi_fun_contract composer (" + (meta.songsCommit || "") + "), as written (sound effects 0). The notes are lab.js's genesisMidi, verified byte-identical to its Cairo composer, and the settings its family's TinyChip presets and chip drums. Each plays on the same reference Beast page as the engine tests, with the species' own regular Beast (level 50, health 200) and its original GIF only, to keep the page small."));
+        listEl.appendChild(el("p", "muted", "One track for each of the 75 original species: the Species Song every Beast of that species plays by default (its Genesis Track), from the production midi_fun_contract composer (" + (meta.songsCommit || "") + "), as written (sound effects 0). The notes and settings come from the same current-recipe adapter as the root sampler, including authored Species Songs, and are verified against the actual Cairo composer. Each plays on the same reference Beast page as the engine tests, with the species' own regular Beast (level 50, health 200) and its original GIF only, to keep the page small."));
       }
       var d = el("details"); var s = el("summary"); s.appendChild(el("span", "", t.sectionId + " " + t.section)); var n = el("span", "n", ""); s.appendChild(n); d.appendChild(s);
       listEl.appendChild(d); sec = { id: t.sectionId, d: d, n: n }; secCount[t.sectionId] = { n: n, total: 0, ids: [] }; body = d;

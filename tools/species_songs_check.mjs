@@ -9,14 +9,15 @@
 // The generated tests do what the Originals Sound Manager does for each species: get_generation_inputs({ composition_seed: 0 }, 0,
 // { species_id: genesis_swap(id), name_variant_id: 0, tier, family }), then BeastPureComposer's compose_sound(Song(base_song), 0),
 // and print the MIDI in hex and a hash of the settings' Cairo Serde. `compare` requires every species' MIDI to equal lab.js's
-// genesisMidi(id, false) and its settings to hash to synth_settings.mjs's family settings (the Yeti's for species 68), which are what
+// current species-recipe composition and its returned settings, including authored arrangements, which are what
 // gen_tracks.mjs puts on the page. Needs scarb and snforge as the checkout's .tool-versions pins them. Run the snforge test in a
 // scratch worktree: it edits lib.cairo, and the hex is large.
 import fs from "node:fs";
+import { productionSource } from "./production-source.mjs";
+import { cases } from "./launch-check-reference/production-cases.mjs";
 
 const mode = process.argv[2];
 const dir = process.env.BEAST_SONGS || (console.error("set BEAST_SONGS"), process.exit(2));
-const bs = dir + "/offchain/beast-sound";
 
 if (mode === "cairo") {
   const tests = Array.from({ length: 25 }, (_, b) => `#[test]\n#[ignore]\nfn species_songs_check_${String(b).padStart(2, "0")}() {\n${[1, 2, 3].map((k) => `    one(${b * 3 + k});\n`).join("")}}\n`);
@@ -57,20 +58,30 @@ fn one(id: u64) {
 
 ${tests.join("\n")}`);
 } else if (mode === "compare") {
-  const idx = await import(bs + "/src/index.js"), v11 = await import(bs + "/src/engine_v11.js"), lab = await import(bs + "/src/lab.js");
-  const SS = await import(bs + "/onchain/tinychip/synth_settings.mjs");
-  const E = idx.engine, V = v11.createEngineV11(E);
-  const lines = fs.readFileSync(process.argv[3], "latin1").split("\n").filter((l) => l.startsWith("SP "));
+  process.env.BEAST = dir;
+  const source = await productionSource();
+  const all = fs.readFileSync(process.argv[3], "latin1").split("\n");
+  let lines = all.filter(l => l.startsWith("SP "));
+  // The full production matrix already captures every FX0 shared Species Song.
+  // Reuse those actual captures instead of inventing a second musical baseline.
+  if (!lines.length) {
+    const matrix = cases();
+    lines = all.filter(l => l.startsWith("PT ")).flatMap(line => {
+      const c = Object.fromEntries(line.trim().split(/\s+/).slice(1).map(x => x.split("=")));
+      const x = matrix[+c.case];
+      return x?.kind === 'species' && x.fx === 0 ? [`SP id=${x.sid} len=${c.hex.length / 2} shash=${c.shash} hex=${c.hex}`] : [];
+    });
+  }
   const bad = [], seen = new Set();
   for (const l of lines) {
     const kv = Object.fromEntries(l.trim().split(/\s+/).slice(1).map((x) => x.split("=")));
     const id = +kv.id;
     if (!Number.isInteger(id) || id < 1 || id > 75 || seen.has(id)) throw new Error('Unexpected/duplicate species ' + kv.id);
     seen.add(id);
-    const swap = lab.GENESIS_SWAPS[id] || id;
-    const midi = Buffer.from(lab.genesisMidi(id, false, E, V).midi);
-    const settings = SS.beastSynthSettings(undefined, SS.variantPrograms({ type: lab.speciesType(swap), mega: false, yeti: swap === 68 }));
-    const sameMidi = midi.length === +kv.len && midi.toString("hex") === kv.hex, sameSettings = idx.poseidonHashMany(SS.serializeSettings(settings)).toString() === kv.shash;
+    const result = source.composer.compose({ sid:id, kind:'species', fx:0, name:0 });
+    const midi = Buffer.from(result.midi);
+    const sameMidi = midi.length === +kv.len && midi.toString("hex") === kv.hex;
+    const sameSettings = source.settings(result.settingsKey).hash === kv.shash;
     if (!sameMidi || !sameSettings) bad.push(`${id}: midi ${sameMidi}, settings ${sameSettings}`);
   }
   console.log(`${lines.length} species: ${lines.length - bad.length} identical to the Cairo composer${bad.length ? "\n" + bad.join("\n") : ""}`);
