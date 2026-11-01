@@ -21,22 +21,33 @@
         ]
       },
       "cairoProof": "cairo-proof.json",
-      "scope": "As-written canonical shared Species Song inputs, name 0, official 39/40 swap once; raw sound presets 0–3 directly through composer. Regular artwork fixed across presets. Technical default 0 does not establish artistic preference."
+      "overrides": [
+        {
+          "sid": 44,
+          "reference": "Original lab 411",
+          "sourceRepository": "https://github.com/loothero/midi_fun_contract",
+          "sourceRevision": "4a16c58bf1738bcd3636f1e475a310b24ecbddc5",
+          "adapterHash": "66aa377a6ada6bc0305ee24db4d489048a79a8dcb2481fb339a7d9d89b6ae772",
+          "cairoProof": "satori-song-cairo-proof.json",
+          "samples": 4
+        }
+      ],
+      "scope": "296 unchanged upstream Casey performances plus Satori original411 in all four effects. No time drift; original 300-Song reference retained separately."
     },
     "check": {
       "label": "Sound Check",
       "sourceRepository": "https://github.com/loothero/midi_fun_contract",
-      "sourceRevision": "036b30cddc4988ef06bcb8a66c24d808f393f4e8",
+      "sourceRevision": "4a16c58bf1738bcd3636f1e475a310b24ecbddc5",
       "samples": 300,
-      "adapterHash": "00d753eb2e18307892791bf5dc37482ae2ba80e493a035bb9402c1137903d3da",
+      "adapterHash": "66aa377a6ada6bc0305ee24db4d489048a79a8dcb2481fb339a7d9d89b6ae772",
       "cairoProof": "check-cairo-proof.json",
       "scope": "75 implemented Sound Check candidates, four raw token sound presets each. Cyclops64 is the whole original504 sequence and is included in the75; musical approval pending. No chip echo."
     }
   },
   "data": {
-    "file": "samples-a4bd4ba45f44bcb5.json.gz",
-    "sha256": "a4bd4ba45f44bcb593ee71ce0caf409a3c434804c7412f2a72821e7507fd6750",
-    "bytes": 1139290,
+    "file": "samples-1db4e55bb50e7c36.json.gz",
+    "sha256": "1db4e55bb50e7c360dc148ad6b1f6ba77dddf6a1e676f9ee51cccfcc74c31504",
+    "bytes": 1143706,
     "samples": 600,
     "species": 75,
     "presets": [
@@ -70,10 +81,10 @@
     "sha256": "44a3eb6140a14a8dfdfbf89fb1feb77eae5604946877d0c138dfb907b83f8154"
   },
   "generatorHashes": {
-    "tools/build-species-presets.mjs": "cf3029f3f825bada667929ffe575cc60f3ecf4014a32976e815b7b37a547751a",
-    "tools/sound-check-parity.mjs": "d044199a0ead586b840a81e9d0321e9482efbf277e8c6c8f6547ce7768e5163a",
-    "tools/launch-check-reference/production-composer.js": "00d753eb2e18307892791bf5dc37482ae2ba80e493a035bb9402c1137903d3da",
-    "tools/launch-check-reference/production-source.mjs": "9962300e52080ff9389c22f11ddfb707dc7aebddfb832d5dd953201f10349a0b",
+    "tools/build-species-presets.mjs": "c06b8352aa7538b46a05d4891488b61d6abd23150a93f94155a0a3e345d4eef6",
+    "tools/sound-check-parity.mjs": "e2135b284251b11ce86def39db69ab16c9b6f0e7558ec02ac6e84e39cee01e09",
+    "tools/launch-check-reference/production-composer.js": "66aa377a6ada6bc0305ee24db4d489048a79a8dcb2481fb339a7d9d89b6ae772",
+    "tools/launch-check-reference/production-source.mjs": "2f0faee250e4056f6f3bcb1cff56af51b7142ec11485ef991c8cbbe43087d282",
     "tools/launch-check-reference/production-cases.mjs": "04e5c40c17aedd65f6989db2655bf03cbd3863a08cfb2d04965b46d9f9a55feb"
   },
   "sampleHashes": [
@@ -2145,49 +2156,49 @@
       "kind": "song",
       "sid": 44,
       "fx": 0,
-      "midiSha256": "ea1d47cd571d15a0ef988b1db80dd1699fedef046985e0ac0aad1c39545a1e3c",
-      "settingsHash": "2921475330441298452992663247180554946589508186294138387405390235004427239368",
-      "settingsSha256": "2910b8927e8fd46085a278b4ae5034479e58432194e376597a51ab7a3b757c4e",
-      "bytes": 1576,
+      "midiSha256": "4b2a582e3c83736b7beaaac19fa44421735006a618c525409d88beb2f2b28aaf",
+      "settingsHash": "1451102955500215537358119820006391674544673565406121651338303252751934635858",
+      "settingsSha256": "22dbcc5f874f2d3c73cce061a979e69b9d3da1c52f923098b60aebca6208b85e",
+      "bytes": 9720,
       "tempoUs": 500000,
-      "notes": 268,
-      "settingsKey": "song-1-0-0"
+      "notes": 1282,
+      "settingsKey": "song/satori-411-0"
     },
     {
       "kind": "song",
       "sid": 44,
       "fx": 1,
-      "midiSha256": "a9ba6eb4ee9cfc0652d5a8508d44d1355bedb8c8436863e3032040be18db8939",
-      "settingsHash": "2747815536812829048463406121005342775377464414418192054209863660811825100882",
-      "settingsSha256": "6c7ae2b9eca0a45686851b9627a66b5478dbc38cba4ba50e1c12e102f0d78a2e",
-      "bytes": 2411,
+      "midiSha256": "b08152146e2530c12a85ce38718901c272eb9d5035f7f8843ca2ffbbbdb06e82",
+      "settingsHash": "2819012999950569582325329557947768245773793515663439542342745935647421586779",
+      "settingsSha256": "f42590730c7cb71099f6dd39dbbe2e12d7a46730edfdb6ff5fb6589eb52470b8",
+      "bytes": 11284,
       "tempoUs": 475000,
-      "notes": 464,
-      "settingsKey": "song-1-1-0"
+      "notes": 1761,
+      "settingsKey": "song/satori-411-1"
     },
     {
       "kind": "song",
       "sid": 44,
       "fx": 2,
-      "midiSha256": "0175be15a67c9900816cb482edda53402eff6152b22b56daff3ab737768a97a5",
-      "settingsHash": "2921475330441298452992663247180554946589508186294138387405390235004427239368",
-      "settingsSha256": "2910b8927e8fd46085a278b4ae5034479e58432194e376597a51ab7a3b757c4e",
-      "bytes": 2136,
+      "midiSha256": "6969454ca7183ed3e0f2390a08ae9ea31085d34e26f93d7961d3126ca1200a20",
+      "settingsHash": "2252402247786285136980547009678295138587748931018933343297508233020797080988",
+      "settingsSha256": "2bbfb79cd632233fdb1e4a72f2998a4fb0f354d110d5b2b6b42b0c3ed6d1adf1",
+      "bytes": 10510,
       "tempoUs": 470000,
-      "notes": 326,
-      "settingsKey": "song-1-0-0"
+      "notes": 1393,
+      "settingsKey": "song/satori-411-2"
     },
     {
       "kind": "song",
       "sid": 44,
       "fx": 3,
-      "midiSha256": "52fa90a7af8aa1a02e96a738f89b8f14d3f7592ef3bd16a6709b5bbe6236146e",
-      "settingsHash": "2747815536812829048463406121005342775377464414418192054209863660811825100882",
-      "settingsSha256": "6c7ae2b9eca0a45686851b9627a66b5478dbc38cba4ba50e1c12e102f0d78a2e",
-      "bytes": 2957,
+      "midiSha256": "237db94adaefd3fa0d6a1dbdafc4b5390461d18612875bfda8ed8b606dfea9ac",
+      "settingsHash": "1118624704619157605086321486057030610248112368344653392663820284729651408454",
+      "settingsSha256": "d56a782b0820da619ebd5e5f2de627a4ac2bafa9fd063df7f2a8607c43d73467",
+      "bytes": 12303,
       "tempoUs": 455000,
-      "notes": 522,
-      "settingsKey": "song-1-1-0"
+      "notes": 1872,
+      "settingsKey": "song/satori-411-3"
     },
     {
       "kind": "song",

@@ -15,7 +15,11 @@ const oldData=JSON.parse(gunzipSync(fs.readFileSync(path.join(dir,original.data.
 const hash=x=>createHash('sha256').update(x).digest('hex');
 assert.equal(data.samples.length,600);
 assert.deepEqual(data.art,oldData.art);assert.deepEqual(data.species,oldData.species);
-for(const s of data.samples.filter(s=>s.kind==='song')){const {kind,...rest}=s;assert.deepEqual(rest,oldData.samples.find(x=>x.sid===s.sid&&x.fx===s.fx));assert.equal(data.settings[s.settingsKey],oldData.settings[s.settingsKey]);}
+const satoriProof=JSON.parse(fs.readFileSync(path.join(dir,'satori-song-cairo-proof.json')));
+for(const s of data.samples.filter(s=>s.kind==='song')){
+ if(s.sid===44){const c=satoriProof.captures.find(x=>x.fx===s.fx);assert.equal(s.midiSha256,c.midiSha256);assert.equal(s.settingsHash,c.settingsHash);assert.equal(s.key,'A Aeolian');continue;}
+ const {kind,...rest}=s;assert.deepEqual(rest,oldData.samples.find(x=>x.sid===s.sid&&x.fx===s.fx));assert.equal(data.settings[s.settingsKey],oldData.settings[s.settingsKey]);
+}
 const browser=await chromium.launch(),context=await browser.newContext({viewport:{width:1280,height:900}});
 await context.addInitScript(()=>{const A=window.AudioContext;window.AudioContext=new Proxy(A,{construct(t,args){const c=new t(...args);(window.__contexts||=[]).push(c);return c}})});
 const page=await context.newPage(),errors=[],external=[],checks=[],peaks=[];
@@ -44,7 +48,7 @@ try{
  assert.equal(await page.evaluate(()=>window.__lastLoaded),data.samples.find(s=>s.kind==='check'&&s.sid===75&&s.fx===3).midi_b64);
  assert.equal(await page.evaluate(()=>window.__contexts.length),1);
  pass('all600 UI selections resolve exact MIDI/settings;75rows/300buttons per mode;one Cyclops row;one context and latest request wins');
- for(const [kind,sid,fx]of [['song',1,0],['song',1,1],['song',1,2],['song',1,3],['song',44,0],['check',64,0],['check',64,1],['check',64,2],['check',64,3],['check',2,2],['check',44,1]])await audible(kind,sid,fx);
+ for(const [kind,sid,fx]of [['song',1,0],['song',1,1],['song',1,2],['song',1,3],['song',44,0],['song',44,1],['song',44,2],['song',44,3],['check',64,0],['check',64,1],['check',64,2],['check',64,3],['check',2,2],['check',44,1]])await audible(kind,sid,fx);
  pass('both modes and all Song presets produce non-silent audio; Cyclops complete504 and another portato Check play through the persistent synth');
  const current=await page.evaluate(()=>({sid:audition.sid,fx:audition.fx,art:document.getElementById('art').src}));
  await page.locator('[data-kind="song"]').click();assert.equal(await page.evaluate(()=>audition.sid),current.sid);assert.equal(await page.evaluate(()=>audition.fx),current.fx);assert.equal(await page.locator('#art').getAttribute('src'),current.art);

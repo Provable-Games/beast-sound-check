@@ -6,7 +6,9 @@ import path from 'node:path';
 import { productionSource, sha256 } from './launch-check-reference/production-source.mjs';
 
 import { cases } from './launch-check-reference/production-cases.mjs';
-const matrix = cases().filter(x => x.kind === 'check' && x.name === 0), kinds = ['check', 'species', 'name', 'purchase', 'edition'];
+const satori = process.argv.includes('--satori');
+const matrix = satori ? [0,1,2,3].map(fx=>({sid:44,kind:'species',fx,name:0,edition:0,seed:'1'})) : cases().filter(x => x.kind === 'check' && x.name === 0), kinds = ['check', 'species', 'name', 'purchase', 'edition'];
+const matrixName = satori ? 'satori-species-songs-v1' : 'shared-sound-checks-v1';
 const mode = process.argv[2];
 if (mode === 'cairo') {
   const selected = matrix;
@@ -69,6 +71,6 @@ ${selected.map((x, i) => `#[test]\n#[ignore]\nfn sound_check_parity_${String(i).
   else {
     const out = process.env.PARITY_OUT || '/tmp/beast-sound-check-parity.json';
     fs.mkdirSync(path.dirname(out), { recursive: true });
-    fs.writeFileSync(out, JSON.stringify({ matrix: 'shared-sound-checks-v1', revision: source.revision, adapterHash: source.adapterHash, casesHash: sha256(JSON.stringify(matrix)), cases: matrix.length, result: 'identical MIDI bytes and Cairo settings hashes' }, null, 2) + '\n');
+    fs.writeFileSync(out, JSON.stringify({ matrix: matrixName, revision: source.revision, adapterHash: source.adapterHash, casesHash: sha256(JSON.stringify(matrix)), cases: matrix.length, result: 'identical MIDI bytes and Cairo settings hashes' }, null, 2) + '\n');
   }
 } else throw new Error('Usage: production-parity.mjs cairo | compare <Cairo log>');

@@ -1,0 +1,48 @@
+{
+  "sourceRevision": "4a16c58bf1738bcd3636f1e475a310b24ecbddc5",
+  "adapterHash": "66aa377a6ada6bc0305ee24db4d489048a79a8dcb2481fb339a7d9d89b6ae772",
+  "samplesFileSha256": "1db4e55bb50e7c360dc148ad6b1f6ba77dddf6a1e676f9ee51cccfcc74c31504",
+  "kind": "song",
+  "sid": 44,
+  "cases": 4,
+  "matrixProof": {
+    "matrix": "satori-species-songs-v1",
+    "revision": "4a16c58bf1738bcd3636f1e475a310b24ecbddc5",
+    "adapterHash": "66aa377a6ada6bc0305ee24db4d489048a79a8dcb2481fb339a7d9d89b6ae772",
+    "casesHash": "e4dd7fc1ef2cbe31e7d057f58ae5e143d649b6eda83ae09887007886711ecdca",
+    "cases": 4,
+    "result": "identical MIDI bytes and Cairo settings hashes"
+  },
+  "captureLogSha256": "d6e2ecd6d38207253940aafe583fbe71580c2185879eddea0235c97f381ec652",
+  "result": "4/4 Satori411 Species Song MIDI bytes and settings hashes match actual captures; Written also equals the independent original411 MIDI/settings",
+  "captures": [
+    {
+      "sid": 44,
+      "fx": 0,
+      "bytes": 9720,
+      "midiSha256": "4b2a582e3c83736b7beaaac19fa44421735006a618c525409d88beb2f2b28aaf",
+      "settingsHash": "1451102955500215537358119820006391674544673565406121651338303252751934635858"
+    },
+    {
+      "sid": 44,
+      "fx": 2,
+      "bytes": 10510,
+      "midiSha256": "6969454ca7183ed3e0f2390a08ae9ea31085d34e26f93d7961d3126ca1200a20",
+      "settingsHash": "2252402247786285136980547009678295138587748931018933343297508233020797080988"
+    },
+    {
+      "sid": 44,
+      "fx": 1,
+      "bytes": 11284,
+      "midiSha256": "b08152146e2530c12a85ce38718901c272eb9d5035f7f8843ca2ffbbbdb06e82",
+      "settingsHash": "2819012999950569582325329557947768245773793515663439542342745935647421586779"
+    },
+    {
+      "sid": 44,
+      "fx": 3,
+      "bytes": 12303,
+      "midiSha256": "237db94adaefd3fa0d6a1dbdafc4b5390461d18612875bfda8ed8b606dfea9ac",
+      "settingsHash": "1118624704619157605086321486057030610248112368344653392663820284729651408454"
+    }
+  ]
+}

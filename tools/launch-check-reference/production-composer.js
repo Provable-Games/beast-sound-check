@@ -46,7 +46,7 @@ export function createProductionComposer({ E, L, V, F, ED, S, species }) {
     if (S && id === 44 && (name === 0 || name === 1)) {
       let recipe = S.satori411SongInputs(name);
       if (purchased) recipe = S.satori411PurchasedInputs(recipe, seed);
-      return { midi: S.satori411PerformanceMidi(name, x.fx, seed), settingsKey: 'satori-411', info: { key: L.keyName(recipe.score), authored: true, presets: [0, 15, 17], channels: 4 } };
+      return { midi: S.satori411PerformanceMidi(name, x.fx, seed), settingsKey: `satori-411-${x.fx}`, info: { key: L.keyName(recipe.score), authored: true, presets: [0, 15, 17], channels: 4 } };
     }
     const b = beast(id, name, mega);
     let resolved;

@@ -97,7 +97,7 @@ export class MidiRoll {
     return this.model;
   }
   group(note) { return note.channel === 9 ? 'drums' : `${note.channel}:${note.program}`; }
-  describe(n) { return `${n.channel === 9 ? `${drumNames[n.pitch] || 'Drum'} ${n.pitch}` : pitchName(n.pitch)} · Ch ${n.channel + 1} · ${n.channel === 9 ? 'Drums' : `P${n.program}`} · velocity ${n.velocity} · ${+((n.end - n.start) / this.model.ppq).toFixed(2)} beats`; }
+  describe(n) { return `${n.channel === 9 ? `${drumNames[n.pitch] || 'Drum'} ${n.pitch}` : pitchName(n.pitch)} · Ch ${n.channel + 1} · ${n.channel === 9 ? 'Drum hit' : `P${n.program}`} · velocity ${n.velocity}${n.channel===9 ? '' : ` · ${+((n.end - n.start) / this.model.ppq).toFixed(2)} beats`}`; }
   setTick(tick, active) {
     if (!this.model) return;
     this.tick = Math.max(0, Math.min(this.model.endTick, tick)); this.active = active;
@@ -126,6 +126,10 @@ export class MidiRoll {
       const y = top + (this.high - pitch) * rowHeight, black = [1,3,6,8,10].includes(pitch % 12);
       c.fillStyle = black ? '#161e18' : '#202a21'; c.fillRect(left,y,plotWidth,rowHeight);
       c.fillStyle = black ? '#263128' : '#424f3d'; c.fillRect(0,y,left-5,rowHeight-.5);
+    }
+    // Paint labels after the keys so narrow neighboring rows cannot clip the glyphs.
+    for (let pitch = this.low; pitch <= this.high; pitch++) {
+      const y = top + (this.high - pitch) * rowHeight;
       if (pitch % 12 === 0 || rowHeight >= 11) { c.fillStyle = '#bec9b2'; c.textAlign = 'right'; c.fillText(pitchName(pitch),left-9,y+rowHeight/2); }
     }
     const step = this.mode === 'full' ? Math.max(1, Math.ceil(m.endTick / m.ppq / (plotWidth / 45))) : 1;
@@ -138,11 +142,11 @@ export class MidiRoll {
     this.drums.forEach((pitch,i) => { const y = drumTop + i*13; c.fillStyle = i%2 ? '#1a221b' : '#222a20'; c.fillRect(left,y,plotWidth,12); c.fillStyle = '#b2a99a'; c.textAlign = 'right'; c.fillText(drumNames[pitch] || String(pitch),left-7,y+6); });
     this.rects = [];
     for (const note of m.notes) {
-      if (note.end < start || note.start > end) continue;
       const drum = note.channel === 9;
+      if (note.start > end || (drum ? note.start < start : note.end < start)) continue;
       const x = xOf(Math.max(start,note.start)), y = drum ? drumTop + this.drums.indexOf(note.pitch)*13+2 : top + (this.high-note.pitch)*rowHeight+1;
-      const w = Math.min(width-10-x, Math.max(2,xOf(Math.min(end,note.end))-x)), h = drum ? 9 : Math.max(2,rowHeight-1.5);
-      const sounding = this.active && note.start <= this.tick && note.end > this.tick;
+      const w = Math.min(width-10-x, drum ? 4 : Math.max(2,xOf(Math.min(end,note.end))-x)), h = drum ? 9 : Math.max(2,rowHeight-1.5);
+      const sounding = this.active && note.start <= this.tick && (drum ? note.start+m.ppq/8 : note.end) > this.tick;
       c.globalAlpha = sounding ? 1 : .4 + note.velocity / 127 * .5;
       c.fillStyle = this.colors.get(this.group(note)); c.fillRect(x,y,w,h); c.globalAlpha = 1;
       if (sounding) { c.strokeStyle = '#ffffff'; c.strokeRect(x-.5,y-.5,w+1,h+1); }

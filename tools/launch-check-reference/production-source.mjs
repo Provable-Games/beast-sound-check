@@ -34,9 +34,10 @@ export async function productionSource() {
       if (key === 'cyclops-check') {
         if (!SS.cyclopsSoundCheckSynthSettings) throw new Error('Composer does not provide Cyclops reference settings');
         s = SS.cyclopsSoundCheckSynthSettings();
-      } else if (key === 'satori-411') {
+      } else if (key === 'satori-411' || /^satori-411-[0-3]$/.test(key)) {
         if (!SS.satori411SynthSettings) throw new Error('Composer does not provide Satori reference settings');
-        s = SS.satori411SynthSettings();
+        const fx = key === 'satori-411' ? 0 : +a[2];
+        s = SS.satori411SynthSettings(!!(fx & 1), fx >= 2);
       } else if (a[0] === 'edition') s = SS.editionSynthSettings(+a[1], +a[2], !!+a[3], editionData ||= SS.editionData());
       else s = SS.beastSynthSettings(undefined, SS.variantPrograms({ type: +a[1], mega: !!+a[2], yeti: !!+a[3] }));
       let hash;
@@ -46,7 +47,7 @@ export async function productionSource() {
   }
   const extraSettingsKeys = [
     ...(SS.cyclopsSoundCheckSynthSettings ? ['cyclops-check'] : []),
-    ...(S && SS.satori411SynthSettings ? ['satori-411'] : []),
+    ...(S && SS.satori411SynthSettings ? [0,1,2,3].map(fx=>`satori-411-${fx}`) : []),
   ];
   return { root, bs, extraSettingsKeys, satoriPath: S ? satoriPath : null, revision: git('rev-parse', 'HEAD'), adapterHash: sha256(fs.readFileSync(new URL('./production-composer.js', import.meta.url))), composer, settings, species, TABLES, styles: ED.STYLES.map((s, i) => ({ index: i, key: s.key, label: s.label, description: s.desc })) };
 }
