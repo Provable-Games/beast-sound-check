@@ -48,5 +48,5 @@ const manifest={schema:'beast-name-song/v1',revision,adapterHash:source.adapterH
 fs.writeFileSync(path.join(out,'manifest.json'),JSON.stringify(manifest,null,2)+'\n');
 for(const file of fs.readdirSync(out))if(/^(composer-[a-f0-9]+\.js|banks-[a-f0-9]+\.json\.gz)$/.test(file)&&![workerFile,dataFile].includes(file))fs.unlinkSync(path.join(out,file));
 const licenses=[source.root+'/LICENSE',...['@scure/starknet','@noble/curves','@noble/hashes'].map(p=>source.bs+'/node_modules/'+p+'/LICENSE')];
-fs.writeFileSync(path.join(out,'NOTICE.txt'),'Pinned Beast Sound reference: https://github.com/caseywescott/midi_fun_contract at '+revision+'\n\n'+licenses.map(p=>p.replace(source.root+'/','')+'\n'+fs.readFileSync(p,'utf8')).join('\n\n'));
+fs.writeFileSync(path.join(out,'NOTICE.txt'),'Pinned Beast Sound reference: https://github.com/loothero/midi_fun_contract at '+revision+'\n\n'+licenses.map(p=>p.replace(source.root+'/','')+'\n'+fs.readFileSync(p,'utf8')).join('\n\n'));
 console.log(JSON.stringify({worker:worker.length,banks:payload.length,revision}));

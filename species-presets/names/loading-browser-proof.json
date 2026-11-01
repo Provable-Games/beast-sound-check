@@ -1,6 +1,6 @@
 {
   "browser": "Chromium",
-  "url": "http://127.0.0.1:8794/species-presets",
+  "url": "http://127.0.0.1:8795/species-presets",
   "checks": [
     "404 Name manifest leaves all 75 rows/600 base choices available, handles named deep links, and retries without reload",
     "abort Name manifest leaves all 75 rows/600 base choices available, handles named deep links, and retries without reload",

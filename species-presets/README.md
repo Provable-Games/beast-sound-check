@@ -64,6 +64,8 @@ The Node check covers all 600 actual tempos and decoded frame pixels, the strict
 
 ## Name Song build and proof
 
+The qualified source is available on the [launch-review fork branch](https://github.com/loothero/midi_fun_contract/tree/feat/beast-sound-check-launch-review), pinned to commit `4a16c58bf1738bcd3636f1e475a310b24ecbddc5`.
+
 `names/manifest.json` separately pins the proposed production source, adapter, source-tree digest, official name table, worker and compressed settings-bank hashes. It leaves the existing 600 samples, their manifest/proofs, settings installer, synth, artwork, MIDI roll and production art helper unchanged. The browser verifies the worker and bank SHA-256 before use. All assets are relative static files, including when served under `/species-presets/`; no RPC, wallet, remote API or backend is involved.
 
 Name metadata initializes only when that mode is selected. A missing or aborted Name manifest leaves the 600 baseline choices available; named deep links show a Name-only unavailable state, and Play retries without reload. While composition is pending or unavailable, the roll hides previous note content and labels the selected name/status. Reduced motion retains the production first-frame still throughout these states.

@@ -1,4 +1,4 @@
-Pinned Beast Sound reference: https://github.com/caseywescott/midi_fun_contract at 4a16c58bf1738bcd3636f1e475a310b24ecbddc5
+Pinned Beast Sound reference: https://github.com/loothero/midi_fun_contract at 4a16c58bf1738bcd3636f1e475a310b24ecbddc5
 
 LICENSE
 MIT License
