@@ -1,0 +1,114 @@
+{
+  "browser": "Chromium",
+  "url": "http://127.0.0.1:8794/species-presets",
+  "revision": "4a16c58bf1738bcd3636f1e475a310b24ecbddc5",
+  "workerSha256": "55130c52798736752bbb15ba492f8abbf411d5cda3fcdbef8cfb522e76705da8",
+  "dataSha256": "fe1205aecaa86fc345b9cd649b351ed3b010f1e753059a57cdba4f0cbd078843",
+  "cairoProofSha256": "d3905bfce8d2ed35e80afac4ad27b01c43ebd32f1e046fa900d6acd715c806f3",
+  "cases": 332,
+  "checks": [
+    "first-ever Name Song resumes one persistent AudioContext synchronously in one click while the worker is delayed",
+    "332 actual browser-worker MIDI/settings outputs match the Cairo captures; all 75 species/four FX and named boundaries; one worker/bounded cache",
+    "official Agony Bane and Blood Shadow Warlocks differ; Satori name 1 differs from its Species Song and uses all four full banks",
+    "all 300 stratified named routes populate the actual piano roll using generated duration/header; 75 rows and official 69 × 18 controls",
+    "both official selectors update the full name/shareable hash; chosen name survives Beast, FX and mode changes; static modes remain independent",
+    "actual Name Song playback is non-silent across four FX, Satori banks, swap boundary, Yeti and Brute family",
+    "Name Song pause/resume holds the audible clock; volume and stop use the same synth and clear voices",
+    "delayed worker results cannot replace a newer static selection or autoplay; rapid named changes finish on the newest selection with one context",
+    "Stop cancels pending named autoplay; an older delayed resume cannot restart or replace the newer static performance",
+    "worker bank errors show an actionable retry; static samples keep playing and Name Songs recover without reload",
+    "generated tempo drives exact production GIF retiming; pause/resume and delayed image completions preserve the selected regular art",
+    "a real full 19-second named Yeti loop restarts the regular artwork at the latency-compensated audible boundary",
+    "last official name and share/reload work; invalid named URLs fall back to the original default without autoplay",
+    "390px controls fit without overflow; reduced motion keeps the regular first-frame still during Name Song playback",
+    "zero JavaScript errors and zero external network requests; every shipped asset resolves relatively"
+  ],
+  "peaks": [
+    {
+      "sid": 1,
+      "fx": 0,
+      "peak": 0.3910827338695526
+    },
+    {
+      "sid": 1,
+      "fx": 1,
+      "peak": 0.2186567336320877
+    },
+    {
+      "sid": 1,
+      "fx": 2,
+      "peak": 0.3910827338695526
+    },
+    {
+      "sid": 1,
+      "fx": 3,
+      "peak": 0.2034814953804016
+    },
+    {
+      "sid": 44,
+      "fx": 0,
+      "peak": 0.13128328323364258
+    },
+    {
+      "sid": 44,
+      "fx": 1,
+      "peak": 0.19615834951400757
+    },
+    {
+      "sid": 44,
+      "fx": 2,
+      "peak": 0.2078210860490799
+    },
+    {
+      "sid": 44,
+      "fx": 3,
+      "peak": 0.1785745471715927
+    },
+    {
+      "sid": 39,
+      "fx": 2,
+      "peak": 0.3548858165740967
+    },
+    {
+      "sid": 40,
+      "fx": 3,
+      "peak": 0.2253362089395523
+    },
+    {
+      "sid": 68,
+      "fx": 0,
+      "peak": 0.33158475160598755
+    },
+    {
+      "sid": 68,
+      "fx": 3,
+      "peak": 0.2623361349105835
+    },
+    {
+      "sid": 75,
+      "fx": 1,
+      "peak": 0.35738879442214966
+    }
+  ],
+  "gesture": {
+    "resume": 167.5,
+    "result": 380.19999980926514
+  },
+  "loop": {
+    "runId": 383,
+    "passIndex": 1,
+    "initial": false,
+    "startTime": 40.94316546031746,
+    "audibleTime": 40.98516546031746,
+    "audioTime": 40.98612244897959,
+    "outputLatency": 0.032,
+    "baseLatency": 0.01,
+    "latencySeconds": 0.042
+  },
+  "errors": [],
+  "external": [],
+  "screenshots": [
+    "/tmp/beast-name-song-desktop.png",
+    "/tmp/beast-name-song-mobile.png"
+  ]
+}

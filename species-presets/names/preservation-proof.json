@@ -1,0 +1,92 @@
+{
+  "baselineCommit": "9343e53868ba9c9b19bbaa1fd0d18f15f5ea551f",
+  "result": "byte-identical baseline assets and proof sources",
+  "samples": 600,
+  "artworks": 75,
+  "files": [
+    {
+      "file": "species-presets/NOTICE.txt",
+      "sha256": "ffa5034425fb5c6c3333c185ced922cf9e5cfe06c94178514fcbb6bbc40da7fc"
+    },
+    {
+      "file": "species-presets/art-sync-source.json",
+      "sha256": "1789825716437c01ed2dd336ff6fc03e199c7c61c1706738f2827dd337a6a58f"
+    },
+    {
+      "file": "species-presets/art-sync.mjs",
+      "sha256": "b4dfd6c1630f6e1731f0bda73b461106603bc582c0dd9b00fbf7230e9f2128b7"
+    },
+    {
+      "file": "species-presets/browser-proof.json",
+      "sha256": "1a9b721caf4cd65846226186e2bbdc82b0f9e3be8937097aabed043c3f6c1d7a"
+    },
+    {
+      "file": "species-presets/cairo-proof.json",
+      "sha256": "714cb39eb17634e036a60d5c986162bb210cb2d7f6e8da1d95bc5ab61518f077"
+    },
+    {
+      "file": "species-presets/check-cairo-proof.json",
+      "sha256": "89cc8d1b2d4fe7c001f0d21ae333a6f56b25360fb6208cb0fbd2e859fde06e28"
+    },
+    {
+      "file": "species-presets/manifest.json",
+      "sha256": "bc4ae1c13b55116ca08dfa865aedd57c73d526a4110112c0a81ace557ddd12eb"
+    },
+    {
+      "file": "species-presets/midi-roll.mjs",
+      "sha256": "79b33350c1ee91ebac40095e67af3a6ce31e3dfb3ce4ba2287f385ae7508f4cf"
+    },
+    {
+      "file": "species-presets/music-clock.mjs",
+      "sha256": "98354e5e94ab8c8819d86f4739d71444d260e759c3170cfb66c36b8dc2775715"
+    },
+    {
+      "file": "species-presets/onchain-midi-player-LICENSE.txt",
+      "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+    },
+    {
+      "file": "species-presets/onchain-midi-player-NOTICE.txt",
+      "sha256": "4333bebb7458eb57965f9c9b108f060c8db8d8968bc87869d1585ef9b343eae4"
+    },
+    {
+      "file": "species-presets/samples-1db4e55bb50e7c36.json.gz",
+      "sha256": "1db4e55bb50e7c360dc148ad6b1f6ba77dddf6a1e676f9ee51cccfcc74c31504"
+    },
+    {
+      "file": "species-presets/samples-e075863e3a5186b0.json.gz",
+      "sha256": "e075863e3a5186b060b0ae04e393ee93f3c0e45ac427d0ce6b2cdb29f25939ba"
+    },
+    {
+      "file": "species-presets/satori-song-cairo-proof.json",
+      "sha256": "c3751037fb2d6d04002656d62b7508b91a8f39b1c5b7a8471fdcc1d34c2e79fc"
+    },
+    {
+      "file": "species-presets/settings.js",
+      "sha256": "95541554ff0340347776696dd641d8b911a7acf28ed42770352922dc970b77fb"
+    },
+    {
+      "file": "species-presets/species-song-browser-proof.json",
+      "sha256": "75024c4449cad2ce6008b13c3a4cf13814f7c8aca80acae07a20f420356b3723"
+    },
+    {
+      "file": "species-presets/species-song-manifest.json",
+      "sha256": "98a555d5090cf22d3be118a3f5634c9cc7a85aac9f277e4333e52201d2562765"
+    },
+    {
+      "file": "species-presets/synth.js",
+      "sha256": "1cc2fe98bdd9c8ae0d030d00f5b5350f139a4062a314176f07ca4b820debe4f4"
+    },
+    {
+      "file": "tools/launch-check-reference/production-cases.mjs",
+      "sha256": "04e5c40c17aedd65f6989db2655bf03cbd3863a08cfb2d04965b46d9f9a55feb"
+    },
+    {
+      "file": "tools/launch-check-reference/production-composer.js",
+      "sha256": "66aa377a6ada6bc0305ee24db4d489048a79a8dcb2481fb339a7d9d89b6ae772"
+    },
+    {
+      "file": "tools/launch-check-reference/production-source.mjs",
+      "sha256": "2f0faee250e4056f6f3bcb1cff56af51b7142ec11485ef991c8cbbe43087d282"
+    }
+  ]
+}
