@@ -3,10 +3,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import { productionSource, sha256 } from './production-source.mjs';
+import { productionSource, assertCanonicalMusic, sha256 } from './production-source.mjs';
 import * as ART from './art.mjs';
 
 const source = await productionSource();
+const music = assertCanonicalMusic(source.root);
 const OMP = process.env.OMP || '/workspace/onchain-midi-player';
 const { settingsText } = await import(OMP + '/scripts/segments.mjs');
 const { build } = await import(source.bs + '/node_modules/esbuild/lib/main.js');
@@ -29,8 +30,8 @@ for (let type = 0; type < 3; type++) for (const mega of [0, 1]) {
 }
 const art = {};
 for (let id = 1; id <= 75; id++) for (const shiny of [0, 1]) {
-  const beast = { id, prefix: 1, suffix: 1, level: 50, health: 200, rank: 0, tier: Math.floor((id - 1) % 25 / 5) + 1, beast_type: Math.floor((id - 1) / 25), shiny, animated: 1 };
-  art[id + '-' + shiny] = ART.card({ beast, art: ART.speciesArt(id, !!shiny), tempoUs: 500000, mode: 'gif', strings: { name: source.TABLES.species[id - 1], type: ['Magic', 'Hunter', 'Brute'][beast.beast_type], prefix: '__PREFIX__', suffix: '__SUFFIX__' }, mediaTitle: '__TITLE__' });
+  const beast = { id, prefix: 0, suffix: 0, level: 50, health: 200, rank: 0, tier: Math.floor((id - 1) % 25 / 5) + 1, beast_type: Math.floor((id - 1) / 25), shiny, animated: 1 };
+  art[id + '-' + shiny] = ART.card({ beast, art: ART.speciesArt(id, !!shiny), tempoUs: 500000, mode: 'gif', strings: { name: source.TABLES.species[id - 1], type: ['Magic', 'Hunter', 'Brute'][beast.beast_type], prefix: '', suffix: '' }, mediaTitle: '__TITLE__' });
 }
 const payload = zlib.gzipSync(JSON.stringify({ settings, art }), { level: 9 });
 const dataFile = 'data-' + sha256(payload).slice(0, 16) + '.json.gz';
@@ -38,13 +39,12 @@ fs.writeFileSync(path.join(out, dataFile), payload);
 const imports = [
   ['E0', source.bs + '/src/index.js'], ['L', source.bs + '/src/lab.js'],
   ['V0', source.bs + '/src/engine_v11.js'], ['F', source.bs + '/src/full_midi.js'],
-  ['ED', source.bs + '/src/editions_lite.js'], ['A', here + '/production-composer.js'],
+  ['ED', source.bs + '/src/editions_lite.js'], ['A', here + '/production-composer.js'], ['H', here + '/card-header.mjs'],
 ].map(([name, file]) => `import * as ${name} from ${JSON.stringify(file)};`).join('\n');
 const bundle = await build({ stdin: { contents: `${imports}
 const composer = A.createProductionComposer({ E: E0.engine, L, V: V0.createEngineV11(E0.engine), F, ED, species: ${JSON.stringify(source.species)} });
 const table = ${JSON.stringify(source.TABLES)};
 let data;
-const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
 self.onmessage = async event => {
   const { request, input } = event.data;
   try {
@@ -57,10 +57,10 @@ self.onmessage = async event => {
     }).catch(e => { data = null; throw e; });
     const shared = await data, result = composer.compose(input), x = result.input;
     const nm = L.nameFromVariant(x.name), title = table.species[x.sid - 1];
-    let svg = shared.art[x.sid + '-' + (x.fx & 1)]
-      .replaceAll('__PREFIX__', esc(nm.prefix ? table.prefixes[nm.prefix - 1] : ''))
-      .replaceAll('__SUFFIX__', esc(nm.suffix ? table.suffixes[nm.suffix - 1] : ''))
-      .replaceAll('__TITLE__', esc(title));
+    const svg = H.withCardHeader(shared.art[x.sid + '-' + (x.fx & 1)], {
+      name: title, prefix: nm.prefix ? table.prefixes[nm.prefix - 1] : '',
+      suffix: nm.suffix ? table.suffixes[nm.suffix - 1] : '', rank: H.previewRank(x.sid),
+    }).replaceAll('__TITLE__', title);
     // Keep the renderer's inert notes marker on the card. The page includes the notes module
     // only when the visual preset supports it, according to the Sepolia rendition manifest.
     self.postMessage({ request, input: x, midi: result.midi, settings: shared.settings[result.settingsKey], svg, info: result.info }, [result.midi.buffer]);
@@ -70,7 +70,7 @@ const js = bundle.outputFiles[0].contents;
 const workerFile = 'composer-' + sha256(js).slice(0, 16) + '.js';
 fs.writeFileSync(path.join(out, workerFile), js);
 const manifest = {
-  schema: 'beast-production-sampler/v1', revision: source.revision, adapterHash: source.adapterHash,
+  schema: 'beast-production-sampler/v1', music, revision: source.revision, adapterHash: source.adapterHash,
   worker: 'production/' + workerFile, data: 'production/' + dataFile,
   identity: sha256(source.revision + source.adapterHash + sha256(js) + sha256(payload)).slice(0, 20),
   species: source.TABLES.species.map((name, i) => ({ id: i + 1, name })),

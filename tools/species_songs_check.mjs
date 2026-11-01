@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Checks section 6's Species Songs (gen_tracks.mjs) against the Cairo composer of the same checkout, byte for byte.
 //
-//   BEAST_SONGS=<midi_fun_contract checkout of Casey's branch> node tools/species_songs_check.mjs cairo > $BEAST_SONGS/beasts/beast_contracts/src/species_songs_check.cairo
+//   BEAST_SONGS=<midi_fun_contract checkout of the Beasts-pinned release> node tools/species_songs_check.mjs cairo > $BEAST_SONGS/beasts/beast_contracts/src/species_songs_check.cairo
 //   echo '#[cfg(test)] mod species_songs_check;' >> $BEAST_SONGS/beasts/beast_contracts/src/lib.cairo     # in a scratch worktree
 //   (cd $BEAST_SONGS/beasts/beast_contracts && snforge test --max-n-steps 4294967295 --max-threads 4 species_songs_check --include-ignored > /tmp/songs.txt)
 //   BEAST_SONGS=<the same checkout> node tools/species_songs_check.mjs compare /tmp/songs.txt
@@ -61,17 +61,20 @@ ${tests.join("\n")}`);
   const SS = await import(bs + "/onchain/tinychip/synth_settings.mjs");
   const E = idx.engine, V = v11.createEngineV11(E);
   const lines = fs.readFileSync(process.argv[3], "latin1").split("\n").filter((l) => l.startsWith("SP "));
-  const bad = [];
+  const bad = [], seen = new Set();
   for (const l of lines) {
     const kv = Object.fromEntries(l.trim().split(/\s+/).slice(1).map((x) => x.split("=")));
-    const id = +kv.id, swap = lab.GENESIS_SWAPS[id] || id;
+    const id = +kv.id;
+    if (!Number.isInteger(id) || id < 1 || id > 75 || seen.has(id)) throw new Error('Unexpected/duplicate species ' + kv.id);
+    seen.add(id);
+    const swap = lab.GENESIS_SWAPS[id] || id;
     const midi = Buffer.from(lab.genesisMidi(id, false, E, V).midi);
     const settings = SS.beastSynthSettings(undefined, SS.variantPrograms({ type: lab.speciesType(swap), mega: false, yeti: swap === 68 }));
     const sameMidi = midi.length === +kv.len && midi.toString("hex") === kv.hex, sameSettings = idx.poseidonHashMany(SS.serializeSettings(settings)).toString() === kv.shash;
     if (!sameMidi || !sameSettings) bad.push(`${id}: midi ${sameMidi}, settings ${sameSettings}`);
   }
   console.log(`${lines.length} species: ${lines.length - bad.length} identical to the Cairo composer${bad.length ? "\n" + bad.join("\n") : ""}`);
-  process.exit(lines.length === 75 && !bad.length ? 0 : 1);
+  process.exit(seen.size === 75 && !bad.length ? 0 : 1);
 } else {
   console.error("usage: species_songs_check.mjs cairo | compare <snforge output>");
   process.exit(2);

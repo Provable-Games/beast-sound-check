@@ -1,10 +1,15 @@
 {
   "schema": "beast-production-sampler/v1",
-  "revision": "e9b0f66c67c5d6ba1755753ad712d3a20f95ee00",
+  "music": {
+    "repository": "https://github.com/caseywescott/midi_fun_contract",
+    "tag": "v1.0.1",
+    "revision": "8d1d96e664bd35d468e66830324ef25a42fd58bd"
+  },
+  "revision": "8d1d96e664bd35d468e66830324ef25a42fd58bd",
   "adapterHash": "3bed767f41b280550a685edd399afdc36b0622c0e90b4d6c18dada33cb6dd551",
-  "worker": "production/composer-4f85391e27d469c7.js",
-  "data": "production/data-c8211b3d0dbe51c2.json.gz",
-  "identity": "16132dcfddc59b244733",
+  "worker": "production/composer-89dbf0ebfc9febef.js",
+  "data": "production/data-ae3feb87164fc4ac.json.gz",
+  "identity": "b8a52b2f9eb4c8ec2620",
   "species": [
     {
       "id": 1,
@@ -539,12 +544,12 @@
     }
   ],
   "parity": {
-    "revision": "e9b0f66c67c5d6ba1755753ad712d3a20f95ee00",
+    "revision": "8d1d96e664bd35d468e66830324ef25a42fd58bd",
     "adapterHash": "3bed767f41b280550a685edd399afdc36b0622c0e90b4d6c18dada33cb6dd551",
     "casesHash": "e9fa7b1f00916dc482639f841397b0c7e483e6badb496b7a9cbb6f8c3796c145",
     "cases": 1611,
     "result": "identical MIDI bytes and Cairo settings hashes"
   },
-  "workerBytes": 128069,
-  "dataBytes": 219831
+  "workerBytes": 129890,
+  "dataBytes": 219618
 }

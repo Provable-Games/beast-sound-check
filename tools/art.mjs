@@ -4,6 +4,7 @@
 // variant: the GIF decoded into one PNG sprite sheet, stepped by SMIL <animate calcMode='discrete'> at a
 // beat-derived frame length (beasts-v3 issue 132). The card's art-frame background carries data-notes-bg, so
 // the page draws the token's notes behind the Beast (beasts-v3 #218, onchain-midi-player's notes fragment).
+import { withCardHeader } from "./card-header.mjs";
 import { createRequire } from "node:module";
 import fs from "node:fs";
 import zlib from "node:zlib";
@@ -105,7 +106,6 @@ const sec = (us) => (us / 1e6).toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
 const TIER_COLOR = ["#ffffff", "#ff8800", "#8c00bf", "#0000ff", "#00ff00", "#ffffff"];
 const esc = (s) => String(s).replace(/[<>&']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;" }[c]));
 
-const RANK_COLOR = ["#ffffff", "#e6c56e", "#c0c0c0", "#cd7f32"];
 const PIXELATED = "image-rendering:pixelated; image-rendering:-moz-crisp-edges; -ms-interpolation-mode:nearest-neighbor;";
 
 /**
@@ -118,15 +118,7 @@ export function card({ beast, art, tempoUs, mode, cardSync = false, strings, med
   let s = beast.shiny ? TEMPLATE.shiny : TEMPLATE.regular;
   const sub = (re, rep) => { if (!re.test(s)) throw new Error("template: " + re); s = s.replace(re, rep); };
   if (!beast.shiny) sub(/(Z' )fill='#[0-9a-fA-F]{6}'/, `$1fill='${TIER_COLOR[beast.tier] || "#ffffff"}'`);
-  const rankRe = /<text x='[0-9.]+' y='23\.96' text-anchor='end' class='label'[^>]*>RANK<\/text><text x='[0-9.]+' y='46' text-anchor='end' style='fill:#[0-9a-fA-F]{6};font-size:22px'>[0-9]+<\/text>/;
-  if (!beast.rank) sub(rankRe, "");
-  else sub(rankRe, (m) => m.replace(/style='fill:#[0-9a-fA-F]{6}/, `style='fill:${RANK_COLOR[beast.rank] || RANK_COLOR[0]}`).replace(/>[0-9]+<\/text>$/, `>${beast.rank}</text>`));
-  const nameRe = /<text x='125\.5' y='22\.84'[^>]*>[^<]*<\/text><text x='125\.5' y='46'[^>]*>[^<]*<\/text>/;
-  const title = esc(strings.name);
-  if (beast.prefix || beast.suffix) {
-    const pre = [strings.prefix, strings.suffix].filter(Boolean).join(" ");
-    sub(nameRe, `<text x='125.5' y='22.84' text-anchor='middle' style='fill:#fff;font-size:14px;letter-spacing:1px'>"${esc(pre)}"</text><text x='125.5' y='46' text-anchor='middle' style='fill:#fff;font-size:30px;letter-spacing:1px'>${title}</text>`);
-  } else sub(nameRe, `<text x='125.5' y='46' text-anchor='middle' style='fill:#fff;font-size:34px;letter-spacing:1px'>${title}</text>`);
+  s = withCardHeader(s, { name: strings.name, prefix: beast.prefix ? strings.prefix : '', suffix: beast.suffix ? strings.suffix : '', rank: beast.rank });
   const vals = [String(beast.tier), String(beast.level), strings.type, String(beast.level * Math.max(1, 6 - beast.tier)), String(beast.health)];
   let k = 0;
   s = s.replace(/(class='valL'[^>]*>)[^<]*(<)/g, (_, a, b) => a + esc(vals[k++]) + b);
