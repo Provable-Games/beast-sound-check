@@ -1,0 +1,79 @@
+#!/usr/bin/env node
+// Verify a stratified NamedSong matrix against actual Cairo compose_sound outputs.
+// Run generated tests in an isolated archive of the clean CHECK_BEAST revision.
+import fs from 'node:fs';
+import path from 'node:path';
+import { productionSource, sha256 } from './launch-check-reference/production-source.mjs';
+
+
+import { namedCases } from './name-song-cases.mjs';
+process.env.BEAST ||= '/tmp/beast-cyclops-effects-size';
+const matrix = namedCases(), kinds = ['check','species','name','purchase','edition'];
+const matrixName = 'named-songs-v1';
+const mode = process.argv[2];
+if (mode === 'cairo') {
+  const selected = matrix;
+  console.log(`use beast_composer::composition::beast_v3_sound::PackableBeastV3;
+use beast_composer::composition::generation::{get_generation_inputs, generate_inputs};
+use beast_composer::composition::genesis::{genesis_swap, species_tier, species_type};
+use beast_composer::composition::sound_check::sound_check_inputs;
+use beast_composer::inputs::{BeastMusicalIdentity, ComposerInputs, EditionCompositionConfig};
+use crate::pure_composer::compose_sound;
+
+fn hexof(bytes: @ByteArray) -> ByteArray {
+    let mut hex: ByteArray = "";
+    let mut i = 0;
+    while i < bytes.len() {
+        let x = bytes.at(i).unwrap();
+        let (hi, lo) = DivRem::div_rem(x, 16);
+        hex.append_byte(if hi < 10 { 48 + hi } else { 87 + hi });
+        hex.append_byte(if lo < 10 { 48 + lo } else { 87 + lo });
+        i += 1;
+    }
+    hex
+}
+#[inline(never)]
+fn one(case: u32, sid: u64, kind: u8, fx: u8, name: u16, edition: u64, seed: felt252) {
+    let source = if kind == 1 { genesis_swap(sid) } else { sid };
+    let identity = BeastMusicalIdentity { species_id: source.try_into().unwrap(), name_variant_id: name, tier: species_tier(source), family: species_type(source) };
+    let inputs = if kind == 0 {
+        let prefix = if name == 0 { 0 } else { ((name - 1) / 18 + 1).try_into().unwrap() };
+        let suffix = if name == 0 { 0 } else { ((name - 1) % 18 + 1).try_into().unwrap() };
+        ComposerInputs::SoundCheck(sound_check_inputs(PackableBeastV3 { id: sid, prefix, suffix, level: 50, health: 200, shiny: 0, animated: 0, tier: species_tier(sid), beast_type: species_type(sid) }))
+    } else {
+        let base = get_generation_inputs(EditionCompositionConfig { composition_seed: 0 }, edition, identity);
+        if kind >= 3 { generate_inputs(base, edition, seed) } else { ComposerInputs::Song(base.base_song) }
+    };
+    let sound = compose_sound(inputs, fx);
+    let mut settings = array![];
+    Serde::serialize(@sound.settings, ref settings);
+    println!("PT case={} shash={} hex={}", case, core::poseidon::poseidon_hash_span(settings.span()), hexof(@sound.midi));
+}
+${selected.map((x, i) => `#[test]\n#[ignore]\nfn name_song_parity_${String(i).padStart(4, '0')}() { one(${i}, ${x.sid}, ${kinds.indexOf(x.kind)}, ${x.fx}, ${x.name}, ${x.edition}, ${x.seed}); }`).join('\n')}`);
+} else if (mode === 'compare') {
+  const source = await productionSource();
+  const lines = fs.readFileSync(process.argv[3], 'latin1').split('\n').filter(l => l.startsWith('PT '));
+  const seen = new Set(), failures = [], captures=[];
+  const {settingsText}=await import((process.env.OMP||'/workspace/onchain-midi-player')+'/scripts/segments.mjs');
+  for (const line of lines) {
+    const c = Object.fromEntries(line.trim().split(/\s+/).slice(1).map(x => x.split('=')));
+    const n = +c.case;
+    if (!matrix[n] || seen.has(n)) throw new Error('Unexpected/duplicate case ' + n);
+    seen.add(n);
+    const r = source.composer.compose(matrix[n]), midi = Buffer.from(r.midi).toString('hex');
+    if (midi !== c.hex || source.settings(r.settingsKey).hash !== c.shash) {
+      let at = 0; while (at < midi.length && midi[at] === c.hex[at]) at++;
+      failures.push({ case: n, ...matrix[n], midi: midi === c.hex, settings: source.settings(r.settingsKey).hash === c.shash, at: Math.floor(at / 2), js: midi.slice(Math.max(0, at - 20), at + 30), cairo: c.hex.slice(Math.max(0, at - 20), at + 30) });
+    }
+    captures.push({case:n,...matrix[n],midiSha256:sha256(Buffer.from(c.hex,'hex')),settingsSha256:sha256(settingsText(source.settings(r.settingsKey).value)),cairoSettingsHash:c.shash,settingsKey:r.settingsKey});
+    if (seen.size % 200 === 0) console.log(`Compared ${seen.size}/${lines.length}`);
+  }
+  console.log(`${seen.size - failures.length}/${seen.size} production samples match Cairo MIDI and settings`);
+  if (failures.length) console.log(JSON.stringify(failures.slice(0, 25), null, 2));
+  if (failures.length || seen.size !== matrix.length) process.exitCode = 1;
+  else {
+    const out = process.env.PARITY_OUT || new URL('../species-presets/names/parity.json',import.meta.url);
+    fs.mkdirSync(path.dirname(out instanceof URL ? out.pathname : out), { recursive: true });
+    fs.writeFileSync(out, JSON.stringify({ matrix: matrixName, revision: source.revision, adapterHash: source.adapterHash, casesHash: sha256(JSON.stringify(matrix)), cases: matrix.length, result: 'identical MIDI bytes and Cairo settings hashes', cairoLogSha256:sha256(fs.readFileSync(process.argv[3])), sourceManifest:JSON.parse(fs.readFileSync(new URL('../species-presets/names/manifest.json',import.meta.url))), captures:captures.sort((a,b)=>a.case-b.case) }, null, 2) + '\n');
+  }
+} else throw new Error('Usage: production-parity.mjs cairo | compare <Cairo log>');
