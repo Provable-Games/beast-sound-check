@@ -1,0 +1,22 @@
+onchain-midi-player
+Copyright 2026 Provable Games
+https://github.com/Provable-Games/onchain-midi-player
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product embeds a modified version of webaudio-tinysynth by
+Tatsuya Shinyagaito (g200kg), https://github.com/g200kg/webaudio-tinysynth,
+licensed under the Apache License, Version 2.0. The modified version is
+maintained as pocket-synth at https://github.com/Provable-Games/pocket-synth; see that
+repository's NOTICE file for the list of modifications.
+
+The player page also embeds a gunzip routine derived from fflate by
+Arjun Barrett, https://github.com/101arrowz/fflate, licensed under the
+MIT License (Copyright (c) 2026 Arjun Barrett; the full text is in
+tests/vendor/fflate-0.8.3.LICENSE and in the class's license()).
+
+The class also embeds the base64 encoder of game-components (the package
+game_components_encoding) by Provable Games,
+https://github.com/Provable-Games/game-components, licensed under the MIT
+License (Copyright (c) 2026 Provable Games; the full text is in
+tests/vendor/game-components.LICENSE and in the class's license()).

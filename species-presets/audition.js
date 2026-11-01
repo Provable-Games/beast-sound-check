@@ -1,11 +1,31 @@
 import { createSynth, installSettings, decodeSettings } from './settings.js';
 import { MidiRoll } from './midi-roll.mjs';
+import { musicClock } from './music-clock.mjs';
+import { syncSvgToMusic, restartImgOnPass, beatSeconds } from './art-sync.mjs';
 const $ = id => document.getElementById(id);
 const modeLabels = { song:['Written','Mega','Echo','Mega + echo'], check:['Written','Mega','Portato','Mega/accent'] };
 const labels = () => modeLabels[state.kind];
 const title = () => state.kind === 'check' ? 'Sound Check' : 'Species Song';
 const state = { kind:'check', sid: 1, fx: 0, status: 'stopped', serial: 0, synth: null, data: null, current: null, volume: 1 };
 window.audition = state;
+const timing = musicClock(state);
+state.timing = timing;
+let artControls = null, artSync = null, artSelection = 0;
+function mountArt() {
+  // A helper captures its original source. Recreate it for every selection so a
+  // pending image/still from an older species or performance cannot replace it.
+  artSync?.dispose(); artControls?.();
+  const img = $('art');
+  // Namespace each helper's r=N URLs across selections, including a return to
+  // the same species/tempo. Only the media type changes; the SVG bytes do not.
+  img.src = state.data.art[state.sid].replace(';base64,', `;selection=${++artSelection};base64,`);
+  img.alt = `${state.current.name}, regular Beast card`;
+  const midi = bytes(state.current.midi_b64);
+  artControls = restartImgOnPass(img, timing, { beat:s => beatSeconds(s, midi) });
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  if (reduced) artControls.pause();
+  artSync = syncSvgToMusic(null, timing, { img:reduced ? null : artControls });
+}
 const roll = new MidiRoll($('midi-panel'));
 const clock = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 const bytes = text => Uint8Array.from(atob(text), c => c.charCodeAt(0));
@@ -30,9 +50,6 @@ function render() {
   document.querySelectorAll('.species-row [data-fx]').forEach(button=>button.setAttribute('aria-label',`${state.data.species[+button.dataset.sid-1].name}, ${title()}, preset ${button.dataset.fx}, ${labels(+button.dataset.sid)[+button.dataset.fx]}`));
   const headers = state.kind === 'check' ? ['SPECIES','0 · Written','1 · Mega','2 · Portato','3 · Accent'] : ['SPECIES','0 · Written','1 · Mega','2 · Echo','3 · Both'];
   document.querySelectorAll('#column-head span').forEach((span,i)=>span.textContent=headers[i]);
-  const art = state.data.art[s.sid];
-  if ($('art').getAttribute('src') !== art) $('art').src = art;
-  $('art').alt = `${s.name}, regular Beast card`;
   document.querySelectorAll('[data-fx]').forEach(button => {
     const sid = button.dataset.sid ? +button.dataset.sid : state.sid;
     button.setAttribute('aria-pressed', String(sid === state.sid && +button.dataset.fx === state.fx));
@@ -45,6 +62,7 @@ function stop() {
   ++state.serial;
   state.synth?.stopMIDI();
   state.status = 'stopped';
+  timing.reset();
   state.playbackStart = null; roll.setTick(0, false);
   status('Stopped');
   $('progress').style.width = '0%'; $('time').textContent = '0:00';
@@ -57,13 +75,14 @@ function playSelected() {
     if (!state.synth) state.synth = createSynth(window.WebAudioTinySynth, s);
     const synth = state.synth;
     synth.stopMIDI();
+    state.status = 'stopped'; timing.reset();
     installSettings(synth, s);
     synth.setMasterVol(s.master_vol / 100 * state.volume);
     synth.prewarm();
     // Resume is called synchronously inside the actual click/key gesture. All
     // 600 choices reuse this one synth/context; an older request cannot start.
     const resumed = synth.resume();
-    state.status = 'starting'; status('Starting…'); render();
+    state.status = 'starting'; timing.changed(); status('Starting…'); render();
     Promise.resolve(resumed).then(() => {
       if (request !== state.serial) return;
       synth.loadMIDI(bytes(sample.midi_b64));
@@ -72,37 +91,38 @@ function playSelected() {
       // Use its public start time and AudioContext clock so pause freezes the
       // roll and loop boundaries stay aligned with what reaches the speakers.
       state.playbackStart = synth.getPlayStatus().startTime;
-      state.status = 'playing'; status(`${sample.fx} · ${labels()[sample.fx]} · Playing`); render();
+      state.status = 'playing'; timing.started(); status(`${sample.fx} · ${labels()[sample.fx]} · Playing`); render();
     }).catch(error => failed(error, request));
   } catch (error) { failed(error, request); }
 }
 function failed(error, request) {
   if (request !== state.serial) return;
-  state.status = 'stopped'; state.synth?.stopMIDI(); render();
+  state.status = 'stopped'; state.synth?.stopMIDI(); timing.reset(); render();
   state.playbackStart = null; roll.setTick(0, false);
   status(`Tap Play to start audio: ${error.message || error}`);
 }
 function select(sid, fx, play = true, kind = state.kind) {
   if (!state.data) return;
-  ++state.serial; state.synth?.stopMIDI(); state.status = 'stopped';
+  ++state.serial; state.synth?.stopMIDI(); state.status = 'stopped'; timing.reset();
   state.kind = kind; state.sid = sid; state.fx = fx; state.current = state.lookup.get(`${kind}-${sid}-${fx}`);
   if (!state.current) throw new Error('Missing sample selection');
   state.playbackStart = null;
   state.midi = roll.setMidi(bytes(state.current.midi_b64), `${state.current.name} · ${title()} · ${labels()[fx]}`);
   $('progress').style.width = '0%'; $('time').textContent = '0:00';
+  mountArt();
   status(`${fx} · ${labels()[fx]} · Ready`); render();
   if (play) playSelected();
 }
 function toggle() {
   if (state.status === 'playing') {
     const request = ++state.serial;
-    state.status = 'paused'; status('Paused'); render();
+    state.status = 'paused'; timing.changed(); status('Paused'); render();
     state.synth.getAudioContext().suspend().catch(e => failed(e, request));
   } else if (state.status === 'paused') {
     const request = ++state.serial;
     Promise.resolve(state.synth.resume()).then(() => {
       if (request !== state.serial) return;
-      state.status = 'playing'; status(`${state.fx} · ${labels()[state.fx]} · Playing`); render();
+      state.status = 'playing'; timing.changed(); status(`${state.fx} · ${labels()[state.fx]} · Playing`); render();
     }).catch(e => failed(e, request));
   } else playSelected();
 }
@@ -164,7 +184,7 @@ try {
     requestAnimationFrame(animate);
     if (now - lastFrame < 33 || !state.synth || !['playing','paused'].includes(state.status) || state.playbackStart == null) return;
     lastFrame = now;
-    const elapsed = Math.max(0, state.synth.getAudioContext().currentTime - state.playbackStart);
+    const elapsed = timing.getPlayStatus().positionSeconds ?? 0;
     const seconds = elapsed % state.midi.duration, tick = state.midi.secondsToTick(seconds);
     roll.setTick(tick, state.status === 'playing');
     $('progress').style.width = `${seconds / state.midi.duration * 100}%`; $('time').textContent = clock(seconds);
@@ -173,4 +193,4 @@ try {
 } catch (error) {
   status(error.message); $('source').textContent = 'Samples unavailable'; $('details').textContent = 'Reload to try again.';
 }
-window.addEventListener('pagehide', () => { ++state.serial; state.synth?.stopMIDI(); state.synth?.getAudioContext()?.close(); });
+window.addEventListener('pagehide', () => { ++state.serial; artSync?.dispose(); artControls?.(); timing.dispose(); state.synth?.stopMIDI(); state.synth?.getAudioContext()?.close(); });

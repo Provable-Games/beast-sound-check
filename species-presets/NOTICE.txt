@@ -256,3 +256,13 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Artwork synchronization uses onchain-midi-player at exact revision
+38e21a1d67b4e39103341ad8f6f961ac36d5ef7a, Copyright 2026 Provable Games.
+art-sync.mjs is an unmodified copy of examples/beast_consumer/art_sync.js.
+music-clock.mjs adapts the audible clock, latency refresh and pass notification
+portions of player/player.js to observe this lab's existing persistent synth.
+tools/deps/gif-decode.mjs is the unmodified upstream test-only GIF decoder.
+Exact source paths and SHA-256 hashes: art-sync-source.json.
+Apache-2.0 license: onchain-midi-player-LICENSE.txt.
+Original upstream notice: onchain-midi-player-NOTICE.txt.

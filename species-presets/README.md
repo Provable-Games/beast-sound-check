@@ -7,6 +7,10 @@ One page has two modes, with the same 75 original Beasts and four preset buttons
 
 Switching modes retains the selected species and preset. Both modes reuse one pocket-synth 2.1.2 context, and the same regular card is fixed across modes/presets. Search, stepping, keyboard controls and pause/resume work in both modes. The Satori replacement is the shared Species composition; named songs are not included.
 
+During playback the first embedded card GIF uses the production music policy: one frame per eighth note through 150 BPM, then one per quarter note above 150 BPM. Uneven native frames retain whole-step proportions; cumulative centisecond rounding and repeated frames limit timing drift. The music’s audible pass restarts it on each loop. Pause replaces just that GIF with a still; resume and visibility restoration recover its musical phase where the GIF supports it, with the production first-frame fallback otherwise. Ambient SVG/SMIL keeps running. Reduced motion holds the first GIF frame throughout. Before playback, the original native GIF timing is retained. The canonical regular artwork remains independent of sound effects.
+
+`art-sync.mjs` is byte-identical to the production-pinned `examples/beast_consumer/art_sync.js` at `38e21a1d67b4e39103341ad8f6f961ac36d5ef7a`. `music-clock.mjs` adapts the same revision’s audible clock, browser latency compensation and pass notifications to the existing multi-selection transport. Artwork and piano roll share that clock; the music payload and synth scheduling are unchanged. Exact paths, hashes, license and adaptation notes are in `art-sync-source.json` and the accompanying Apache license/notice files. Browser GIF/image decoding can delay a replacement by one decode, as in production; browser latency is an estimate, and the upstream 17ms display lead is preserved.
+
 The default mode is Sound Check. Existing links such as `/#64-0` still open the Species Song. Use `/#check-64-0` for the included Cyclops Sound Check, or `/#check-1-0` to start at Warlock. Preset 0 is a technical default, not evidence of an artistic preference.
 
 The reviewed combined page is served locally on port 8791. To run it:
@@ -45,3 +49,13 @@ AUDITION_URL=http://127.0.0.1:8791 LD_LIBRARY_PATH=/tmp/beasts-browser-runtime/r
 ```
 
 The browser check verifies all 600 UI-to-MIDI/settings routes, 296 unchanged Songs plus the four Cairo-proven Satori replacements, mode/preset persistence, non-silent audio including all four Satori and Cyclops performances, single-context/no-overlap behavior, rapid selection, aliases/keyboard, legacy/new links, decoded art and 390px layout. `browser-proof.json` records the result. No wallet, RPC, backend service, deployment or external requests are involved.
+
+
+Animation regression checks (with the candidate served locally):
+
+```sh
+node tools/art-sync-test.mjs
+AUDITION_URL=http://127.0.0.1:8793 LD_LIBRARY_PATH=/tmp/beasts-browser-runtime/root/usr/lib/x86_64-linux-gnu node tools/art-sync-browser.mjs
+```
+
+The Node check covers all 600 actual tempos and decoded frame pixels, the strict 150 BPM boundary, uneven delays, GIF rotation/fallbacks, and audible pass/pause/latency semantics. The browser check covers actual low/high-tempo performances and FX changes, full loops, phase restoration on resume/visibility events, intentionally delayed/stale image loads, first-frame reduced-motion pixels, decode/resize/mobile layout, single-context playback, and no errors or external requests. The visibility event is simulated so its phase check is deterministic; background throttling and device-specific audio/display latency remain browser limits.

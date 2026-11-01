@@ -13,6 +13,8 @@ const data=JSON.parse(gunzipSync(fs.readFileSync(path.join(dir,manifest.data.fil
 const original=JSON.parse(fs.readFileSync(path.join(dir,'species-song-manifest.json')));
 const oldData=JSON.parse(gunzipSync(fs.readFileSync(path.join(dir,original.data.file))));
 const hash=x=>createHash('sha256').update(x).digest('hex');
+// Retiming/stilling changes only the embedded GIF/PNG, preserving card identity.
+const cardIdentity=src=>Buffer.from(src.slice(src.indexOf(',')+1),'base64').toString('latin1').replace(/data:image\/(?:gif|png);base64,[A-Za-z0-9+/=]+/,'RASTER');
 assert.equal(data.samples.length,600);
 assert.deepEqual(data.art,oldData.art);assert.deepEqual(data.species,oldData.species);
 const satoriProof=JSON.parse(fs.readFileSync(path.join(dir,'satori-song-cairo-proof.json')));
@@ -50,8 +52,8 @@ try{
  pass('all600 UI selections resolve exact MIDI/settings;75rows/300buttons per mode;one Cyclops row;one context and latest request wins');
  for(const [kind,sid,fx]of [['song',1,0],['song',1,1],['song',1,2],['song',1,3],['song',44,0],['song',44,1],['song',44,2],['song',44,3],['check',64,0],['check',64,1],['check',64,2],['check',64,3],['check',2,2],['check',44,1]])await audible(kind,sid,fx);
  pass('both modes and all Song presets produce non-silent audio; Cyclops complete504 and another portato Check play through the persistent synth');
- const current=await page.evaluate(()=>({sid:audition.sid,fx:audition.fx,art:document.getElementById('art').src}));
- await page.locator('[data-kind="song"]').click();assert.equal(await page.evaluate(()=>audition.sid),current.sid);assert.equal(await page.evaluate(()=>audition.fx),current.fx);assert.equal(await page.locator('#art').getAttribute('src'),current.art);
+ const current=await page.evaluate(()=>({sid:audition.sid,fx:audition.fx,art:audition.data.art[audition.sid]}));
+ await page.locator('[data-kind="song"]').click();assert.equal(await page.evaluate(()=>audition.sid),current.sid);assert.equal(await page.evaluate(()=>audition.fx),current.fx);assert.equal(cardIdentity(await page.locator('#art').getAttribute('src')),cardIdentity(current.art));
  assert.match(await page.locator('.presets [data-fx="2"]').textContent(),/Echo/);
  await page.locator('[data-kind="check"]').click();assert.equal(await page.evaluate(()=>audition.sid),current.sid);assert.equal(await page.evaluate(()=>audition.fx),current.fx);assert.match(await page.locator('.presets [data-fx="2"]').textContent(),/Portato/);
  pass('mode switches preserve species/preset/fixed art and use accurate Song echo vs Check portato labels');
