@@ -273,3 +273,7 @@ Run these in order after every new Beasts V3 Sepolia deployment. Use worktrees, 
 4. **Rebuild `index.html`** ([Rebuild](#rebuild), step 3): the page only offers the sets it was built with, and picks the newest by block. Run the smoke test.
 
 5. **Commit** the new set and the page, and remove the previous set.
+
+Current preview cards use the renderer's fixed-point VT323 icon/digit centering for Power and Health. The shiny fixture's token-specific finish wear is removed for pristine previews. `tools/card-stats-check.mjs` uses the header-check harness above: replace `card-header-check.mjs` with `card-stats-check.mjs`, the test filter with `stats_`, and compare its resulting log. It verifies 50 actual Cairo cards covering every digit bearing and one-to-five-digit boundaries, including all remaining card chrome after normalizing art injection and formatting.
+
+`node tools/refresh-species-art.mjs` refreshes the listening room's 75 current cards without composing music. It retains the prior payload and Cairo proofs, and records sample/settings/species preservation in `species-presets/art-preservation-proof.json`. The complete listening builder also generates current art independently of the immutable upstream Song archive.

@@ -4,6 +4,7 @@
 // variant: the GIF decoded into one PNG sprite sheet, stepped by SMIL <animate calcMode='discrete'> at a
 // beat-derived frame length (beasts-v3 issue 132). The card's art-frame background carries data-notes-bg, so
 // the page draws the token's notes behind the Beast (beasts-v3 #218, onchain-midi-player's notes fragment).
+import { withCardStats } from "./card-stats.mjs";
 import { withCardHeader } from "./card-header.mjs";
 import { createRequire } from "node:module";
 import fs from "node:fs";
@@ -18,6 +19,8 @@ const GENESIS = B3 + "/assets/genesis";
 const fixture = (name) => fs.readFileSync(`${B3}/fixtures/renderer/${name}/raw.svg`, "utf8").replace(/\r?\n\s*/g, "");
 // Perfectly centred cards (no print offset or defects; the art is swapped below), so every card lays out the same.
 const TEMPLATE = { regular: fixture("regular-static-tier-1-rank-1-opaque-png"), shiny: fixture("shiny-animated-tier-3-rank-1242-transparent-gif") };
+// The shiny fixture carries token-specific finish wear; previews model pristine cards.
+TEMPLATE.shiny = TEMPLATE.shiny.replace(/<clipPath id='finishLossClip'[\s\S]*?<\/pattern>/, '').replace("fill='url(#finishMaterial)'", "fill='url(#shinyRim)'");
 for (const [k, t] of Object.entries(TEMPLATE)) if (/id='print'|data-play-anchor='(?!235 54 24 top-right')/.test(t)) throw new Error(`template ${k}: not a centred card (print offset or moved play anchor)`);
 
 const crc = (buf) => zlib.crc32(buf);
@@ -123,6 +126,7 @@ export function card({ beast, art, tempoUs, mode, cardSync = false, strings, med
   let k = 0;
   s = s.replace(/(class='valL'[^>]*>)[^<]*(<)/g, (_, a, b) => a + esc(vals[k++]) + b);
   if (k !== 5) throw new Error("template: valL count " + k);
+  s = withCardStats(s, { power: beast.level * Math.max(1, 6 - beast.tier), health: beast.health });
   let image;
   if (!art.animated || mode === "gif") {
     const uri = art.animated ? art.gifUri : art.pngUri;

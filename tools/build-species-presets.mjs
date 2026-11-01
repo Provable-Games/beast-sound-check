@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Preserve the upstream reference; audition the selected Satori replacement and launch checks.
 import fs from 'node:fs';
+import { speciesCardArt, speciesCardArtSource } from './species-card-art.mjs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { gzipSync, gunzipSync } from 'node:zlib';
@@ -87,13 +88,13 @@ for(const line of satoriLog.toString('latin1').split('\n').filter(l=>l.startsWit
   satoriSeen.add(fx);satoriCaptures.push({sid:44,fx,bytes:s.bytes,midiSha256:s.midiSha256,settingsHash:s.settingsHash});
 }
 if(satoriCaptures.length!==4)throw new Error('Incomplete Satori Cairo proof');
-const data={species:songs.species,samples,settings,art:songs.art};
+const data={species:songs.species,samples,settings,art:speciesCardArt(songs.species)};
 const payload=gzipSync(JSON.stringify(data),{level:9}),file='samples-'+sha256(payload).slice(0,16)+'.json.gz';fs.writeFileSync(path.join(out,file),payload);
 const manifest={schema:'beast-song-check-audition/v2',
   modes:{song:{label:'Species Song',sourceRepository:original.sourceRepository,sourceRevision:original.sourceRevision,samples:300,referenceManifest:'species-song-manifest.json',referenceData:original.data,cairoProof:'cairo-proof.json',overrides:[{sid:44,reference:'Original lab 411',sourceRepository:'https://github.com/loothero/midi_fun_contract',sourceRevision:source.revision,adapterHash:source.adapterHash,cairoProof:'satori-song-cairo-proof.json',samples:4}],scope:'296 unchanged upstream Casey performances plus Satori original411 in all four effects. No time drift; original 300-Song reference retained separately.'},
     check:{label:'Sound Check',sourceRepository:'https://github.com/loothero/midi_fun_contract',sourceRevision:source.revision,samples:300,adapterHash:source.adapterHash,cairoProof:'check-cairo-proof.json',scope:'75 implemented Sound Check candidates, four raw token sound presets each. Cyclops64 is the whole original504 sequence and is included in the75; musical approval pending. No chip echo.'}},
   data:{file,sha256:sha256(payload),bytes:payload.length,samples:600,species:75,presets:[0,1,2,3]},
-  player:original.player,artSource:original.artSource,displayNamesSource:original.displayNamesSource,
+  player:original.player,artSource:speciesCardArtSource(),displayNamesSource:original.displayNamesSource,
   generatorHashes:Object.fromEntries(['tools/build-species-presets.mjs','tools/sound-check-parity.mjs','tools/launch-check-reference/production-composer.js','tools/launch-check-reference/production-source.mjs','tools/launch-check-reference/production-cases.mjs'].map(p=>[p,sha256(fs.readFileSync(path.join(root,p)))])),
   sampleHashes:samples.map(({kind,sid,fx,midiSha256,settingsHash,settingsSha256,bytes,tempoUs,notes,settingsKey})=>({kind,sid,fx,midiSha256,settingsHash,settingsSha256,bytes,tempoUs,notes,settingsKey}))};
 fs.writeFileSync(path.join(out,'manifest.json'),JSON.stringify(manifest,null,2)+'\n');
@@ -101,5 +102,5 @@ fs.writeFileSync(path.join(out,'check-cairo-proof.json'),JSON.stringify({sourceR
 fs.writeFileSync(path.join(out,'satori-song-cairo-proof.json'),JSON.stringify({sourceRevision:source.revision,adapterHash:source.adapterHash,samplesFileSha256:manifest.data.sha256,kind:'song',sid:44,cases:4,matrixProof:satoriProof,captureLogSha256:sha256(satoriLog),result:'4/4 Satori411 Species Song MIDI bytes and settings hashes match actual captures; Written also equals the independent original411 MIDI/settings',captures:satoriCaptures},null,2)+'\n');
 const notice=fs.readFileSync(path.join(out,'NOTICE.txt'),'utf8');
 if(!notice.includes(source.revision))fs.appendFileSync(path.join(out,'NOTICE.txt'),'\nImplemented Sound Check candidate source: https://github.com/loothero/midi_fun_contract at '+source.revision+'\n'+fs.readFileSync(path.join(source.root,'LICENSE'),'utf8'));
-for(const old of fs.readdirSync(out))if(/^samples-[a-f0-9]+\.json\.gz$/.test(old)&&![original.data.file,file].includes(old))fs.unlinkSync(path.join(out,old));
+// Preserve historical payloads: existing Cairo and art-preservation proofs bind their exact hashes.
 console.log(`Built600:296 unchanged CaseySongs+4 actual-Cairo Satori411 Songs+300 actual-Cairo Checks. Gzip ${payload.length}B`);
