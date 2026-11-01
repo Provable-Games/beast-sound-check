@@ -1,7 +1,7 @@
 {
-  "revision": "8d1d96e664bd35d468e66830324ef25a42fd58bd",
-  "adapterHash": "3bed767f41b280550a685edd399afdc36b0622c0e90b4d6c18dada33cb6dd551",
-  "casesHash": "e9fa7b1f00916dc482639f841397b0c7e483e6badb496b7a9cbb6f8c3796c145",
-  "cases": 1611,
+  "revision": "4a16c58bf1738bcd3636f1e475a310b24ecbddc5",
+  "adapterHash": "66aa377a6ada6bc0305ee24db4d489048a79a8dcb2481fb339a7d9d89b6ae772",
+  "casesHash": "6731b600ff3aaa2ec0d9c2378a658a362cdc8e87b6c891cb7699261f245702e4",
+  "cases": 1635,
   "result": "identical MIDI bytes and Cairo settings hashes"
 }

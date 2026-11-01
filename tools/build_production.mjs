@@ -5,6 +5,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { productionSource, assertCanonicalMusic, sha256 } from './production-source.mjs';
 import * as ART from './art.mjs';
+import { cases } from './launch-check-reference/production-cases.mjs';
 
 const source = await productionSource();
 const music = assertCanonicalMusic(source.root);
@@ -15,7 +16,7 @@ const here = path.dirname(new URL(import.meta.url).pathname), root = path.dirnam
 const out = path.join(root, 'production');
 fs.mkdirSync(out, { recursive: true });
 const parity = JSON.parse(fs.readFileSync(path.join(out, 'parity.json'), 'utf8'));
-if (parity.revision !== source.revision || parity.adapterHash !== source.adapterHash) throw new Error('Run production-parity.mjs against this source and adapter before building');
+if (parity.revision !== source.revision || parity.adapterHash !== source.adapterHash || parity.cases !== cases().length || parity.casesHash !== sha256(JSON.stringify(cases()))) throw new Error('Run production-parity.mjs against this source and adapter before building');
 
 const settings = {};
 for (let type = 0; type < 3; type++) for (const mega of [0, 1]) {
@@ -28,6 +29,7 @@ for (let type = 0; type < 3; type++) for (const mega of [0, 1]) {
     settings[key] = settingsText(source.settings(key).value);
   }
 }
+for (const key of source.extraSettingsKeys) settings[key] = settingsText(source.settings(key).value);
 const art = {};
 for (let id = 1; id <= 75; id++) for (const shiny of [0, 1]) {
   const beast = { id, prefix: 0, suffix: 0, level: 50, health: 200, rank: 0, tier: Math.floor((id - 1) % 25 / 5) + 1, beast_type: Math.floor((id - 1) / 25), shiny, animated: 1 };
@@ -40,9 +42,10 @@ const imports = [
   ['E0', source.bs + '/src/index.js'], ['L', source.bs + '/src/lab.js'],
   ['V0', source.bs + '/src/engine_v11.js'], ['F', source.bs + '/src/full_midi.js'],
   ['ED', source.bs + '/src/editions_lite.js'], ['A', here + '/production-composer.js'], ['H', here + '/card-header.mjs'],
+  ...(source.satoriPath ? [['S', source.satoriPath]] : []),
 ].map(([name, file]) => `import * as ${name} from ${JSON.stringify(file)};`).join('\n');
 const bundle = await build({ stdin: { contents: `${imports}
-const composer = A.createProductionComposer({ E: E0.engine, L, V: V0.createEngineV11(E0.engine), F, ED, species: ${JSON.stringify(source.species)} });
+const composer = A.createProductionComposer({ E: E0.engine, L, V: V0.createEngineV11(E0.engine), F, ED, S: ${source.satoriPath ? 'S' : 'undefined'}, species: ${JSON.stringify(source.species)} });
 const table = ${JSON.stringify(source.TABLES)};
 let data;
 self.onmessage = async event => {
@@ -81,5 +84,5 @@ fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify(manifest, null,
 // Old content-addressed builds can be removed: the current site references this build only.
 for (const file of fs.readdirSync(out)) if (/^(?:composer-[a-f0-9]+\.js|data-[a-f0-9]+\.json\.gz)$/.test(file) && ![workerFile, dataFile].includes(file)) fs.unlinkSync(path.join(out, file));
 const licenses = [source.root + '/LICENSE', ...['@scure/starknet', '@noble/curves', '@noble/hashes'].map(p => source.bs + '/node_modules/' + p + '/LICENSE')];
-fs.writeFileSync(path.join(out, 'NOTICE.txt'), 'Beast Sound reference engine: https://github.com/caseywescott/midi_fun_contract at ' + source.revision + '\n\n' + licenses.map((p, i) => (i ? p.split('/').slice(-3).join('/') : 'midi_fun_contract/LICENSE') + '\n' + fs.readFileSync(p, 'utf8')).join('\n\n'));
+fs.writeFileSync(path.join(out, 'NOTICE.txt'), 'Beast Sound reference engine: ' + music.repository + ' at ' + source.revision + '\n\n' + licenses.map((p, i) => (i ? p.split('/').slice(-3).join('/') : 'midi_fun_contract/LICENSE') + '\n' + fs.readFileSync(p, 'utf8')).join('\n\n'));
 console.log(`Production sampler: ${source.revision.slice(0, 7)}, ${source.styles.length} styles; worker ${js.length} B, shared data ${payload.length} B; ${parity.cases} Cairo parity cases`);

@@ -21,7 +21,7 @@
 // and decodeTokenUri, and the token_uri passes scripts/validate_token_uri.mjs, so the bytes are what a
 // 0.7.0 Beast's animation_url would carry.
 import fs from "node:fs";
-import { assertCanonicalMusic } from "./production-source.mjs";
+import { assertCanonicalMusic, productionSource } from "./production-source.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -31,6 +31,7 @@ const OMP = need("OMP");
 const BEAST = need("BEAST");
 const BS = BEAST + "/offchain/beast-sound";
 const music = assertCanonicalMusic(BEAST);
+const currentMusic = await productionSource();
 const imp = (p) => import(p);
 
 const SEG = await imp(OMP + "/scripts/segments.mjs");
@@ -46,12 +47,11 @@ const BEAST_SONGS = process.env.BEAST_SONGS || "";
 const songsMusic = BEAST_SONGS ? assertCanonicalMusic(BEAST_SONGS) : null;
 const SONGS = BEAST_SONGS && {
   label: need("BEAST_SONGS_LABEL"),
-  idx: await imp(BEAST_SONGS + "/offchain/beast-sound/src/index.js"), v11: await imp(BEAST_SONGS + "/offchain/beast-sound/src/engine_v11.js"),
-  lab: await imp(BEAST_SONGS + "/offchain/beast-sound/src/lab.js"), ss: await imp(BEAST_SONGS + "/offchain/beast-sound/onchain/tinychip/synth_settings.mjs"),
+  lab: await imp(BEAST_SONGS + "/offchain/beast-sound/src/lab.js"),
 };
 
 import * as ART from "./art.mjs";
-const { TABLES } = await imp(BS + "/src/index.js");
+const TABLES = currentMusic.TABLES;
 const { genesisTier, genesisType } = await imp(BS + "/src/engine.js");
 const bank = ES.loadBank();
 const DATA = ES.bankData(bank);
@@ -909,28 +909,26 @@ for (const [cat, ids] of Object.entries(cats)) {
 // the Originals Sound Manager publishes it. The manager stores, for each species, the Genesis Track of genesis_swap(id)
 // as ComposerInputs::Song(get_generation_inputs({ composition_seed: 0 }, 0, { species_id: genesis_swap(id), name 0, ... })
 // .base_song) and plays compose(inputs, sound_effects) with the token's sound effects. Here: sound effects 0 (as
-// written: not mega, no echo, no drift) for the regular Beast. The notes are lab.js genesisMidi(id, false), which the
-// branch's parity scripts hold byte-identical to its Cairo; the settings are synth_settings.mjs's family settings
-// (the Yeti's for species 68), hashed against the Cairo constants. Each track is the species' own unnamed Beast
+// written: not mega, no echo, no drift) for the regular Beast. The notes and settings come from the same current-recipe adapter as the root sampler,
+// including authored arrangements, and are checked against the actual Cairo composer. Each track is the species' own unnamed Beast
 // (level 50, health 200, as the song composes it) with the original GIF only (lean: one page, not three).
 // =============================================================================================
 if (SONGS) {
-  const { idx: SI, v11: SV, lab: SL, ss: SSS } = SONGS;
-  const E6 = SI.engine, V6 = SV.createEngineV11(E6);
+  const { lab: SL } = SONGS;
   const FAMILY = ["Magic", "Hunter", "Brute"];
   for (let id = 1; id <= 75; id++) {
     const swap = SL.GENESIS_SWAPS[id] || id; // Harpy (39) and Pegasus (40) publish each other's Genesis Track
     const type = SL.speciesType(swap), tier = SL.speciesTier(swap), yeti = swap === 68;
-    const { midi, info } = SL.genesisMidi(id, false, E6, V6);
-    const settings = SSS.beastSynthSettings(undefined, SSS.variantPrograms({ type, mega: false, yeti }));
+    const { midi, info, settingsKey } = currentMusic.composer.compose({ sid:id, kind:'species', fx:0, name:0 });
+    const settings = currentMusic.settings(settingsKey).value;
     const name = TABLES.species[id - 1], partner = TABLES.species[swap - 1], bpm = +(60e6 / ART.midiTempoUs(midi)).toFixed(2);
     const own = swap === id ? "" : `${name} plays ${partner}'s Genesis Track (the default swap of Harpy and Pegasus, as the Originals Sound Manager publishes it). `;
     add({
       lean: true, section: SEC.songs, title: swap === id ? name : `${name} (${partner}'s song)`,
-      blurb: `The Species Song of the ${name}: the track every ${name} plays by default (its Genesis Track), from the production composer ${SONGS.label}. ${own}${FAMILY[type]} family, tier ${tier}; ${info.key}, ${bpm} BPM, ${info.sections} sections, ${info.channels.length} channels. As written (sound effects 0): not mega, no echo, no drift.`,
+      blurb: `The Species Song of the ${name}: the track every ${name} plays by default (its Genesis Track), from the production composer ${SONGS.label}. ${own}${FAMILY[type]} family, tier ${tier}; ${info.key}, ${bpm} BPM, ${info.channels} channels. As written (sound effects 0): not mega, no echo, no drift.`,
       checks: [
-        `Tap the round play button on the card: the music starts within about half a second, with no error text at the bottom of the player. It is the ${partner}'s Species Song in ${info.key} at ${bpm} BPM: ${info.sections} sections, then the loop.`,
-        `Voices: ${info.channels.join(", ")}. The sounds are the ${FAMILY[type]} family's TinyChip presets (three leads, three plucks)${yeti ? " and Pulse 12.5% Pluck, the Yeti's avalanche," : ""} and the chip drum kit, with reverb 30: the settings the contract returns for this song, not hand-picked presets.`,
+        `Tap the round play button on the card: the music starts within about half a second, with no error text at the bottom of the player. It is the ${partner}'s Species Song in ${info.key} at ${bpm} BPM: the complete written arrangement, then the loop.`,
+        `Voices: ${info.channels} MIDI channels. The sounds use this recipe's TinyChip settings${info.authored ? ' and authored instrument palette' : ''} and chip drum kit, with reverb 30: the settings the current composer returns for this song.`,
         ...(swap === id ? [] : [`${name} and ${partner} swap songs: the card shows the ${name}, the music is the ${partner}'s.`]),
         ...(yeti ? ["The Yeti has its own arrangement: a rock tempo (175 BPM) with an avalanche on the pluck, not a canon like the other species."] : []),
         "Let it loop at least once: no gap and no click at the seam, and the play button still matches what you hear.",

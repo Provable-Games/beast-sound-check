@@ -1,4 +1,4 @@
-Beast Sound reference engine: https://github.com/caseywescott/midi_fun_contract at 8d1d96e664bd35d468e66830324ef25a42fd58bd
+Beast Sound reference engine: https://github.com/loothero/midi_fun_contract at 4a16c58bf1738bcd3636f1e475a310b24ecbddc5
 
 midi_fun_contract/LICENSE
 MIT License
